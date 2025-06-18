@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "448665014220",
+    "project_id": "queensgambit-12ae9",
+    "storage_bucket": "queensgambit-12ae9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:448665014220:android:b0ea99340a065f38035769",
+        "android_client_info": {
+          "package_name": "com.example.queens_gambit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwm4HyjjkquEXZdCGh2fLF1fOL7C9ezY8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:448665014220:android:e4b419c6a777970a035769",
+        "android_client_info": {
+          "package_name": "com.example.queensgambit"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwm4HyjjkquEXZdCGh2fLF1fOL7C9ezY8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

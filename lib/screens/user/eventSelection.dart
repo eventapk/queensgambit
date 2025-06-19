@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:queens_gambit/screens/thank_you_screen.dart';
+import 'package:queens_gambit/screens/user/thank_you_screen.dart';
 
 class EventSelectionScreen extends StatefulWidget {
   final Map<String, dynamic> userData;

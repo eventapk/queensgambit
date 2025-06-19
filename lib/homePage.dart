@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:queens_gambit/screens/admin/adminLoginPage.dart';
-import 'package:queens_gambit/screens/registrationScreen.dart';
+import 'package:queens_gambit/screens/user/registrationScreen.dart';
 
 class HomePage extends StatefulWidget {
   @override

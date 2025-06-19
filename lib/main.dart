@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:queens_gambit/homePage.dart';
 import 'package:queens_gambit/screens/registrationScreen.dart';
+import 'package:queens_gambit/screens/admin/adminhomepage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,7 +14,8 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: RegistrationScreen(),
+
+      home: HomePage(),
     );
   }
 }

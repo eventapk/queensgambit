@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:queens_gambit/screens/thank_you_screen.dart';
+import 'package:queens_gambit/screens/user/thank_you_screen.dart';
 
 class EventSelectionScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
+  final bool isUpdateMode;
 
-  EventSelectionScreen({required this.userData, required bool isUpdateMode});
+  EventSelectionScreen({required this.userData, required this.isUpdateMode});
 
   @override
   _EventSelectionScreenState createState() => _EventSelectionScreenState();
@@ -51,6 +52,7 @@ class _EventSelectionScreenState extends State<EventSelectionScreen> {
         "event": selectedEvent['name'],
         "event_date": selectedEvent['date'],
         "status": "registered",
+        "timestamp": FieldValue.serverTimestamp(),
       };
 
       await docRef.set(updatedUserData);
@@ -96,17 +98,8 @@ class _EventSelectionScreenState extends State<EventSelectionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Select an Event",
-              style: TextStyle(
-                fontSize: width * 0.06,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            SizedBox(height: height * 0.02),
-
-            /// Events List
+            buildTickStepper(width),
+            SizedBox(height: height * 0.04),
             Expanded(
               child: ListView.separated(
                 itemCount: events.length,
@@ -184,7 +177,6 @@ class _EventSelectionScreenState extends State<EventSelectionScreen> {
                 },
               ),
             ),
-
             SizedBox(height: height * 0.02),
             ElevatedButton(
               onPressed: () => registerUser(context),
@@ -206,6 +198,46 @@ class _EventSelectionScreenState extends State<EventSelectionScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget buildTickStepper(double width) {
+    double circleSize = width * 0.08;
+    double tickSize = width * 0.095;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: circleSize,
+          height: circleSize,
+          decoration: const BoxDecoration(
+            color: Color(0xFF0090FF),
+            shape: BoxShape.circle,
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 2,
+            color: const Color(0xFF0090FF),
+          ),
+        ),
+        Container(
+          width: tickSize,
+          height: tickSize,
+          decoration: const BoxDecoration(
+            color: Color(0xFF0090FF),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.check, color: Colors.white, size: tickSize * 0.6),
+        ),
+        Expanded(
+          child: Container(
+            height: 2,
+            color: const Color(0xFF0090FF),
+          ),
+        ),
+      ],
     );
   }
 }

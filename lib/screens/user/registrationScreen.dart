@@ -81,6 +81,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size=MediaQuery.of(context).size;
+    final height=size.height;
+    final width=size.width;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -92,9 +95,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ),
       body: Column(
         children: [
-          SizedBox(height: 20),
-          buildStepper(),
-          SizedBox(height: 20),
+
+
+          SizedBox(height: 10),
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -102,6 +105,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
+                    buildProgressBar(width),
+                    SizedBox(height: height*0.02,),
                     buildTextField(label: "Name:", controller: _nameController),
                     buildTextField(
                       label: "DOB:",
@@ -146,28 +151,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  Widget buildStepper() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Divider(color: Colors.blue[100], thickness: 2, indent: 20, endIndent: 10),
-        ),
-        CircleAvatar(
-          radius: 12,
-          backgroundColor: Colors.blueAccent,
-          child: Icon(Icons.check, color: Colors.white, size: 16),
-        ),
-        Expanded(
-          child: Divider(color: Colors.blue[100], thickness: 2, indent: 10, endIndent: 20),
-        ),
-        CircleAvatar(radius: 12, backgroundColor: Colors.grey.shade300),
-        Expanded(
-          child: Divider(color: Colors.grey.shade300, thickness: 2, indent: 10, endIndent: 20),
-        ),
-      ],
-    );
-  }
+
 
   Widget buildTextField({
     required String label,
@@ -298,4 +282,31 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ),
     );
   }
+}Widget buildProgressBar(double width) {
+  return Padding(
+    padding: EdgeInsets.symmetric(horizontal: width * 0.1),
+    child: Row(
+      children: [
+        Expanded(child: Container(height: 2, color: Colors.blue)),
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.blue,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.check, color: Colors.white, size: 22),
+        ),
+        Expanded(child: Container(height: 2, color: Colors.blue[100])),
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: Colors.blue[100],
+            shape: BoxShape.circle,
+          ),
+        ),
+      ],
+    ),
+  );
 }

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-
 import 'ViewDetailsScreen.dart';
-
 
 class ThankYouScreen extends StatelessWidget {
   final Map<String, dynamic> userData;
@@ -11,12 +9,14 @@ class ThankYouScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Size screenSize = MediaQuery.of(context).size;
+    final double imageHeight = screenSize.height * 0.15;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blue,
         elevation: 0,
-        automaticallyImplyLeading: true,
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -24,17 +24,18 @@ class ThankYouScreen extends StatelessWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 500),
+              constraints: const BoxConstraints(maxWidth: 500),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Image.asset(
                     'assets/images/logo.jpg',
-                    height: 100,
+                    height: imageHeight.clamp(80.0, 150.0),
+                    fit: BoxFit.contain,
                   ),
-                  SizedBox(height: 30),
-                  Text(
+                  const SizedBox(height: 30),
+                  const Text(
                     "Thank You!",
                     style: TextStyle(
                       fontSize: 32,
@@ -43,7 +44,7 @@ class ThankYouScreen extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Text(
                     isUpdate
                         ? "For your registration update"
@@ -54,7 +55,7 @@ class ThankYouScreen extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
                   Text(
                     "Your registration is under approval\nkindly check your",
                     style: TextStyle(
@@ -63,7 +64,7 @@ class ThankYouScreen extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  Text(
+                  const Text(
                     'Email',
                     style: TextStyle(
                       fontSize: 16,
@@ -71,23 +72,30 @@ class ThankYouScreen extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: 40),
+                  const SizedBox(height: 40),
                   Align(
-                    alignment: Alignment.bottomCenter,
+                    alignment: Alignment.center,
                     child: TextButton(
                       onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ViewDetailsScreen(userData: userData),
+                            builder: (_) =>
+                                ViewDetailsScreen(userData: userData),
                           ),
                         );
                       },
-                      child: Text(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
                         "View your details",
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.black,
                         ),
                       ),
                     ),

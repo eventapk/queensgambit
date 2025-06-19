@@ -17,7 +17,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     String email = emailController.text.trim();
     String password = passwordController.text.trim();
 
-    if (email == 'admin123@gmail.com' && password == 'admin123') {
+    if (email == 'a' && password == 'admin123') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login Successful')),
       );

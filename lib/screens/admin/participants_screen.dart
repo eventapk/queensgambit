@@ -12,7 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:ui' as ui;
-import 'participant.dart';
+
 import 'package:queens_gambit/screens/admin/userDetailScreen.dart';
 
 class ParticipantsScreen extends StatefulWidget {
@@ -1244,4 +1244,28 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
       child: Icon(icon, color: color, size: 16),
     );
   }
+}class Participant {
+  int sNo;
+  final String name;
+  final String event;
+  final String phone;
+  final String email;
+  final String age;
+  final String dob;
+  final String gender;
+  final String status;
+  final String eventDate;
+
+  Participant({
+    required this.sNo,
+    required this.name,
+    required this.event,
+    required this.phone,
+    required this.email,
+    required this.age,
+    required this.dob,
+    required this.gender,
+    required this.status,
+    required this.eventDate,
+  });
 }

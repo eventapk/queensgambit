@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'registeredParticipants.dart';
+import 'participants_screen.dart';
 
 class AdminHomePage extends StatelessWidget {
   final String adminEmail;
@@ -135,3 +135,4 @@ class AdminHomePage extends StatelessWidget {
     );
   }
 }
+

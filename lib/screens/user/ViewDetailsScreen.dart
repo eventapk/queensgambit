@@ -6,7 +6,6 @@ import 'eventSelection.dart';
 class ViewDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
 
-  const ViewDetailsScreen({super.key, required this.userData});
 
   @override
   _ViewDetailsScreenState createState() => _ViewDetailsScreenState();
@@ -14,11 +13,6 @@ class ViewDetailsScreen extends StatefulWidget {
 
 class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nameController;
-  late final TextEditingController _ageController;
-  late final TextEditingController _dobController;
-  late final TextEditingController _emailController;
-  late final TextEditingController _phoneController;
   String? _selectedGender;
   bool _isEditable = false;
 
@@ -43,30 +37,11 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
     super.dispose();
   }
 
-  Future<void> _selectDate() async {
     if (!_isEditable) return;
-    final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.tryParse(_dobController.text) ?? DateTime(2000),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Colors.blueAccent,
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
-            ),
-            textButtonTheme: TextButtonThemeData(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.blueAccent,
-              ),
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
     if (picked != null) {
       setState(() {
@@ -136,25 +111,16 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
           label: RichText(
             text: TextSpan(
               text: label,
-              style: const TextStyle(color: Color(0xFF616161), fontSize: 16), // Fixed: Use Color(0xFF616161) for grey[700]
-              children: const [
                 TextSpan(
                   text: ' *',
                   style: TextStyle(color: Colors.red),
-                ),
               ],
             ),
           ),
-          focusedBorder: const OutlineInputBorder(
             borderSide: BorderSide(color: Colors.blueAccent),
-            borderRadius: BorderRadius.all(Radius.circular(8)),
           ),
-          border: const OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(8)),
           ),
           enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.blue.shade100),
-            borderRadius: const BorderRadius.all(Radius.circular(8)),
           ),
         ),
       ),
@@ -167,7 +133,6 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
       child: DropdownButtonFormField<String>(
         value: _selectedGender,
         validator: (value) => value == null || value.isEmpty ? "Please select gender" : null,
-        items: const ['Female', 'Male', 'Others']
             .map((gender) => DropdownMenuItem(value: gender, child: Text(gender)))
             .toList(),
         onChanged: _isEditable ? (value) => setState(() => _selectedGender = value) : null,
@@ -175,20 +140,13 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
           label: RichText(
             text: TextSpan(
               text: "Gender",
-              style: const TextStyle(color: Color(0xFF616161), fontSize: 16), // Fixed: Use Color(0xFF616161) for grey[700]
-              children: const [
                 TextSpan(text: ' *', style: TextStyle(color: Colors.red)),
               ],
             ),
           ),
-          focusedBorder: const OutlineInputBorder(
             borderSide: BorderSide(color: Colors.blueAccent),
-            borderRadius: BorderRadius.all(Radius.circular(8)),
           ),
-          border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
           enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.blue.shade100),
-            borderRadius: const BorderRadius.all(Radius.circular(8)),
           ),
         ),
       ),
@@ -197,14 +155,9 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final height = size.height;
-    final width = size.width;
     return Scaffold(
-      resizeToAvoidBottomInset: true, // Added to handle keyboard overflow
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Edit Your Details"),
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
         actions: [
@@ -215,27 +168,12 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
                 _isEditable = !_isEditable;
               });
             },
-          ),
         ],
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.symmetric(
-              horizontal: constraints.maxWidth * 0.04,
-              vertical: constraints.maxHeight * 0.02,
-            ),
             child: Form(
               key: _formKey,
               child: Column(
                 children: [
-                  buildProgressBar(width),
-                  buildTextField(
-                    label: "Name:",
-                    controller: _nameController,
-                    readOnly: !_isEditable,
-                  ),
                   buildTextField(
                     label: "DOB:",
                     controller: _dobController,
@@ -261,74 +199,27 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
                       readOnly: true,
                       decoration: InputDecoration(
                         labelText: 'Phone Number *',
-                        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
                         enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Colors.blue.shade100),
-                          borderRadius: const BorderRadius.all(Radius.circular(8)),
                         ),
-                        focusedBorder: const OutlineInputBorder(
                           borderSide: BorderSide(color: Colors.blueAccent),
-                          borderRadius: BorderRadius.all(Radius.circular(8)),
                         ),
                       ),
                     ),
                   ),
                   buildDropdownField(),
-                  SizedBox(height: height * 0.05),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _isEditable ? _goToEventSelection : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blueAccent,
-                        padding: EdgeInsets.symmetric(
-                          vertical: height * 0.02,
-                        ),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(8)),
-                        ),
-                      ),
-                      child: const Text(
-                        "Next",
-                        style: TextStyle(fontSize: 16, color: Colors.white),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-          );
-        },
       ),
     );
   }
-}
-
-Widget buildProgressBar(double width) {
-  return Padding(
-    padding: EdgeInsets.symmetric(horizontal: width * 0.1),
-    child: Row(
-      children: [
-        Expanded(child: Container(height: 2, color: Colors.blue)),
-        Container(
-          width: width * 0.12,
-          height: width * 0.12,
-          decoration: const BoxDecoration(
-            color: Colors.blue,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.check, color: Colors.white, size: 22),
-        ),
-        Expanded(child: Container(height: 2, color: Colors.blue.shade100)),
-        Container(
-          width: width * 0.08,
-          height: width * 0.08,
-          decoration: BoxDecoration(
-            color: Colors.blue.shade100,
-            shape: BoxShape.circle,
-          ),
-        ),
-      ],
-    ),
-  );
 }

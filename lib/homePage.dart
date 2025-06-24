@@ -3,8 +3,6 @@ import 'package:queens_gambit/screens/admin/adminLoginPage.dart';
 import 'package:queens_gambit/screens/user/registrationScreen.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
-
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -19,11 +17,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    );
+    )..repeat(reverse: true);
+
     _slideAnimation = Tween<double>(begin: -10, end: 10).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
-    _controller.repeat(reverse: true);
   }
 
   @override
@@ -34,180 +32,137 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final width = size.width;
+    final height = size.height;
+
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final height = constraints.maxHeight;
-
-            return Stack(
-              children: [
-                Column(
-                  children: [
-                    SizedBox(
-                      height: height * 0.32,
-                      width: double.infinity,
-                      child: Image.asset(
-                        'assets/images/boarddesign.jpeg',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(Icons.error, color: Colors.red),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      color: Colors.white,
-                      width: double.infinity,
-                      padding: EdgeInsets.symmetric(vertical: height * 0.045),
-                      child: Center(
-                        child: Container(
-                          constraints: BoxConstraints(maxWidth: width * 0.9),
-                          padding: EdgeInsets.symmetric(horizontal: width * 0.04),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(width * 0.02),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 10,
-                                offset: Offset(0, 6),
-                              ),
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 25,
-                                offset: Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Flexible(
-                                child: Image.asset(
-                                  'assets/images/knightlogo.jpeg',
-                                  width: width * 0.3,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) => const Icon(
-                                    Icons.error,
-                                    color: Colors.red,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: width * 0.05),
-                              Flexible(
-                                child: AnimatedBuilder(
-                                  animation: _slideAnimation,
-                                  builder: (context, child) {
-                                    return Transform.translate(
-                                      offset: Offset(_slideAnimation.value, 0),
-                                      child: Image.asset(
-                                        'assets/images/chesscoin.jpeg',
-                                        width: width * 0.35,
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (context, error, stackTrace) =>
-                                        const Icon(
-                                          Icons.error,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Image.asset(
-                        'assets/images/boarddesign.jpeg',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(Icons.error, color: Colors.red),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                Positioned(
-                  top: height * 0.02,
-                  right: width * 0.04,
-                  child: GestureDetector(
-                    onTap: () {
-                      if (mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const AdminLoginPage()),
-                        );
-                      }
-                    },
+        child: Stack(
+          children: [
+            // Background + content
+            SingleChildScrollView(
+              child: Column(
+                children: [
+                  Image.asset(
+                    'assets/images/boarddesign.jpeg',
+                    width: width,
+                    height: height * 0.28,
+                    fit: BoxFit.cover,
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: height * 0.04),
                     child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: width * 0.04,
-                        vertical: height * 0.015,
-                      ),
+                      width: width * 0.9,
+                      padding: EdgeInsets.symmetric(horizontal: width * 0.04, vertical: height * 0.015),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(width * 0.05),
+                        borderRadius: BorderRadius.circular(12),
                         boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 6,
-                            offset: Offset(0, 2),
+                          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 6)),
+                          BoxShadow(color: Colors.black12, blurRadius: 25, offset: Offset(0, 10)),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Image.asset(
+                              'assets/images/knightlogo.jpeg',
+                              width: width * 0.25,
+                            ),
+                          ),
+                          SizedBox(width: width * 0.04),
+                          Flexible(
+                            child: AnimatedBuilder(
+                              animation: _slideAnimation,
+                              builder: (_, __) => Transform.translate(
+                                offset: Offset(_slideAnimation.value, 0),
+                                child: Image.asset(
+                                  'assets/images/chesscoin.jpeg',
+                                  width: width * 0.3,
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      child: Text(
-                        'Login',
-                        style: TextStyle(
-                          fontSize: width * 0.04,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF0090FF),
-                        ),
-                      ),
+                    ),
+                  ),
+                  Image.asset(
+                    'assets/images/boarddesign.jpeg',
+                    width: width,
+                    height: height * 0.28,
+                    fit: BoxFit.cover,
+                  ),
+                  SizedBox(height: height * 0.13),
+                ],
+              ),
+            ),
+
+            // Top-right login button
+            Positioned(
+              top: height * 0.03,
+              right: width * 0.04,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 6),
+                  ],
+                ),
+                child: IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AdminLoginPage()),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.person,
+                    color: const Color(0xFF0090FF),
+                    size: width * 0.07,
+                  ),
+                  tooltip: 'Admin Login',
+                ),
+              ),
+            ),
+
+            // Bottom-center register button
+            Positioned(
+              bottom: height * 0.03,
+              left: width * 0.15,
+              right: width * 0.15,
+              child: SizedBox(
+                height: height * 0.06,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => RegistrationScreen()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0090FF),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 10,
+                    shadowColor: Colors.black38,
+                  ),
+                  child: Text(
+                    "Register Now",
+                    style: TextStyle(
+                      fontSize: width * 0.045,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                Positioned(
-                  bottom: height * 0.08,
-                  left: width * 0.2,
-                  right: width * 0.2,
-                  child: SizedBox(
-                    height: height * 0.06,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (mounted) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) =>  RegistrationScreen()),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0090FF),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(width * 0.03),
-                        ),
-                        elevation: 8,
-                        shadowColor: Colors.black26,
-                      ),
-                      child: Text(
-                        'Register Now',
-                        style: TextStyle(
-                          fontSize: width * 0.045,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         ),
       ),
     );

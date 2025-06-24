@@ -12,8 +12,53 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:ui' as ui;
-
 import 'package:queens_gambit/screens/admin/userDetailScreen.dart';
+
+class Participant {
+  int sNo;
+  final String name;
+  final String event;
+  final String phone;
+  final String email;
+  final String? age;
+  final String dob;
+  final String gender;
+  final String status;
+  final String eventDate;
+  final DateTime timestamp;
+
+  Participant({
+    required this.sNo,
+    required this.name,
+    required this.event,
+    required this.phone,
+    required this.email,
+    this.age,
+    required this.dob,
+    required this.gender,
+    required this.status,
+    required this.eventDate,
+    required this.timestamp,
+  });
+}
+
+enum NotificationType { userLogin, newParticipant }
+
+class NotificationItem {
+  final String id;
+  final String message;
+  final NotificationType type;
+  final DateTime timestamp;
+  final String userId;
+
+  NotificationItem({
+    required this.id,
+    required this.message,
+    required this.type,
+    required this.timestamp,
+    required this.userId,
+  });
+}
 
 class ParticipantsScreen extends StatefulWidget {
   final String status;
@@ -37,8 +82,13 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
   String filterAge = '';
   String filterEvent = '';
   bool showAllParticipants = false;
+  List<NotificationItem> notifications = [];
+  int notificationCount = 0;
+  bool showNotificationDropdown = false;
+  Set<String> previousUserIds = {};
+  Set<String> previousLoginIds = {};
+  StreamSubscription<QuerySnapshot>? _loginSubscription;
 
-  // EmailJS credentials
   static const serviceId = 'service_vgb2gw6';
   static const registrationTemplateId = 'template_bvs05a3';
   static const qrTemplateId = 'template_xul6stb';
@@ -48,6 +98,7 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
   void initState() {
     super.initState();
     listenToParticipants();
+    listenToUserLogins();
   }
 
   void listenToParticipants() {
@@ -61,21 +112,44 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
 
     _subscription = query.snapshots().listen(
           (snapshot) {
-        final List<Participant> loaded = snapshot.docs.map((doc) {
+        final List<Participant> loaded = [];
+        for (var doc in snapshot.docs) {
           final data = doc.data() as Map<String, dynamic>;
-          return Participant(
+          loaded.add(Participant(
             sNo: 0,
             name: data['name'] ?? 'N/A',
             event: data['event'] ?? 'N/A',
             phone: doc.id,
             email: data['email'] ?? '',
-            age: data['age'] ?? '',
+            age: data['age']?.toString(),
             dob: data['dob'] ?? '',
             gender: data['gender'] ?? '',
             status: data['status'] ?? 'approved',
             eventDate: data['event_date'] ?? 'Not Assigned',
-          );
-        }).toList();
+            timestamp: _getTimestampFromData(data),
+          ));
+        }
+
+        // Sort by timestamp (newest first)
+        loaded.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+        Set<String> currentUserIds = loaded.map((p) => p.phone).toSet();
+        if (previousUserIds.isNotEmpty) {
+          Set<String> newUserIds = currentUserIds.difference(previousUserIds);
+          for (String newUserId in newUserIds) {
+            Participant newUser =
+            loaded.firstWhere((p) => p.phone == newUserId);
+            NotificationItem notification = NotificationItem(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              message: "New ${widget.status} participant: ${newUser.name}",
+              type: NotificationType.newParticipant,
+              timestamp: DateTime.now(),
+              userId: newUserId,
+            );
+            _addNotification(notification);
+          }
+        }
+        previousUserIds = currentUserIds;
 
         setState(() {
           allParticipants = loaded;
@@ -88,6 +162,102 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
         setState(() => isLoading = false);
       },
     );
+  }
+
+  DateTime _getTimestampFromData(Map<String, dynamic> data) {
+    // Try to get timestamp from possible fields
+    if (data['timestamp'] is Timestamp) {
+      return (data['timestamp'] as Timestamp).toDate();
+    } else if (data['createdAt'] is Timestamp) {
+      return (data['createdAt'] as Timestamp).toDate();
+    } else if (data['created_at'] is Timestamp) {
+      return (data['created_at'] as Timestamp).toDate();
+    } else if (data['updatedAt'] is Timestamp) {
+      return (data['updatedAt'] as Timestamp).toDate();
+    } else if (data['updated_at'] is Timestamp) {
+      return (data['updated_at'] as Timestamp).toDate();
+    }
+    // Fallback to current time
+    return DateTime.now();
+  }
+
+  void listenToUserLogins() {
+    _loginSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .where('isOnline', isEqualTo: true)
+        .snapshots()
+        .listen((snapshot) {
+      Set<String> currentLoginIds = snapshot.docs.map((doc) => doc.id).toSet();
+      if (previousLoginIds.isNotEmpty) {
+        Set<String> newLoginIds = currentLoginIds.difference(previousLoginIds);
+        for (String userId in newLoginIds) {
+          var userDoc = snapshot.docs.firstWhere((doc) => doc.id == userId);
+          String userName = userDoc.data()['name'] ?? 'Unknown User';
+          NotificationItem notification = NotificationItem(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            message: "$userName just logged in",
+            type: NotificationType.userLogin,
+            timestamp: DateTime.now(),
+            userId: userId,
+          );
+          _addNotification(notification);
+        }
+      }
+      previousLoginIds = currentLoginIds;
+    }, onError: (error) {
+      print("Error listening to user logins: $error");
+    });
+  }
+
+  void _addNotification(NotificationItem notification) {
+    setState(() {
+      notifications.insert(0, notification);
+      notificationCount++;
+      if (notifications.length > 20) {
+        notifications.removeLast();
+      }
+    });
+
+    Timer(const Duration(seconds: 20), () {
+      if (mounted) {
+        setState(() {
+          if (notificationCount > 0) {
+            notificationCount = 0;
+          }
+        });
+      }
+    });
+  }
+
+  void _clearNotifications() {
+    setState(() {
+      notifications.clear();
+      notificationCount = 0;
+      showNotificationDropdown = false;
+    });
+  }
+
+  void _toggleNotificationDropdown() {
+    setState(() {
+      showNotificationDropdown = !showNotificationDropdown;
+      if (showNotificationDropdown) {
+        notificationCount = 0;
+      }
+    });
+  }
+
+  String _getTimeAgo(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
   }
 
   void updateSearch(String query) {
@@ -110,10 +280,11 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
           (filterEvent.isEmpty || p.event == filterEvent);
     }).toList();
 
+    // First sort by status (completed at bottom)
     filteredParticipants.sort((a, b) {
       if (a.status == 'completed' && b.status != 'completed') return 1;
       if (a.status != 'completed' && b.status == 'completed') return -1;
-      return 0;
+      return 0; // Maintain existing timestamp order (newest first)
     });
 
     for (int i = 0; i < filteredParticipants.length; i++) {
@@ -143,8 +314,9 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
   }
 
   bool allUsersSelected() {
-    final selectableParticipants =
-    filteredParticipants.where((p) => p.status != 'completed').toList();
+    final selectableParticipants = filteredParticipants
+        .where((p) => p.status != 'completed')
+        .toList();
     return selectedPhones.length == selectableParticipants.length &&
         selectableParticipants.isNotEmpty;
   }
@@ -180,7 +352,8 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = '${userId}_$timestamp.png';
-      final storageRef = FirebaseStorage.instance.ref().child('qrcodes/$fileName');
+      final storageRef =
+      FirebaseStorage.instance.ref().child('qrcodes/$fileName');
 
       await storageRef.putData(
         pngBytes,
@@ -205,15 +378,24 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
     required String eventName,
     required String eventDate,
   }) async {
+    if (toEmail.isEmpty || !toEmail.contains('@')) {
+      throw Exception('Invalid email address: $toEmail');
+    }
+
     final paymentLink =
         "https://your-payment-portal.com/pay?event=${Uri.encodeComponent(eventName)}&participant=${Uri.encodeComponent(participantName)}";
 
     final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
 
     try {
+      print('Sending registration email to: $toEmail');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'origin': 'http://localhost',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode({
           'service_id': serviceId,
           'template_id': registrationTemplateId,
@@ -231,11 +413,15 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
         }),
       );
 
+      print('Email API Response: ${response.statusCode} - ${response.body}');
       if (response.statusCode != 200) {
-        throw Exception('Failed to send registration email: ${response.body}');
+        throw Exception(
+            'Failed to send registration email: ${response.statusCode} - ${response.body}');
       }
+      print('Registration email sent successfully to: $toEmail');
     } catch (e) {
-      throw Exception('Error sending registration email: $e');
+      print('Error sending registration email to $toEmail: $e');
+      throw Exception('Error sending registration email to $toEmail: $e');
     }
   }
 
@@ -245,12 +431,21 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
     required String participantName,
     required String eventName,
   }) async {
+    if (toEmail.isEmpty || !toEmail.contains('@')) {
+      throw Exception('Invalid email address: $toEmail');
+    }
+
     final url = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
 
     try {
+      print('Sending QR email to: $toEmail');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'origin': 'http://localhost',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode({
           'service_id': serviceId,
           'template_id': qrTemplateId,
@@ -261,17 +456,22 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
             'subject': 'Your Event QR Code',
             'qr_url': qrUrl,
             'qr_data': 'Event Ticket - $eventName',
-            'message': 'Please find your QR code attached. Use this for event entry.',
+            'message':
+            'Please find your QR code attached. Use this for event entry.',
             'sender_name': 'QR Mailer App',
           },
         }),
       );
 
+      print('QR Email API Response: ${response.statusCode} - ${response.body}');
       if (response.statusCode != 200) {
-        throw Exception('Failed to send QR email: ${response.body}');
+        throw Exception(
+            'Failed to send QR email: ${response.statusCode} - ${response.body}');
       }
+      print('QR email sent successfully to: $toEmail');
     } catch (e) {
-      throw Exception('Error sending QR email: $e');
+      print('Error sending QR email to $toEmail: $e');
+      throw Exception('Error sending QR email to $toEmail: $e');
     }
   }
 
@@ -294,8 +494,9 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
             SizedBox(width: MediaQuery.of(context).size.width * 0.05),
             Flexible(
               child: Text(
-                'Approving users and sending emails...',
-                style: TextStyle(fontSize: MediaQuery.of(context).size.width * 0.035),
+                'Processing users and sending emails...',
+                style: TextStyle(
+                    fontSize: MediaQuery.of(context).size.width * 0.035),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -308,67 +509,168 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
       final batch = FirebaseFirestore.instance.batch();
       int successCount = 0;
       int failCount = 0;
+      List<String> failedEmails = [];
+      List<String> errorMessages = [];
 
       for (final phone in selectedPhones) {
         try {
-          final docRef = FirebaseFirestore.instance.collection('users').doc(phone);
+          print('Processing user: $phone');
+          final docRef =
+          FirebaseFirestore.instance.collection('users').doc(phone);
           final userDoc = await docRef.get();
 
-          if (userDoc.exists) {
-            final userData = userDoc.data() as Map<String, dynamic>;
-            final currentStatus = userData['status'] ?? '';
+          if (!userDoc.exists) {
+            print('User document not found: $phone');
+            failCount++;
+            errorMessages.add('User $phone not found');
+            continue;
+          }
 
-            if (currentStatus == 'registered') {
-              batch.update(docRef, {'status': 'waiting'});
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final currentStatus = userData['status'] ?? '';
+          final userEmail = userData['email'] ?? '';
+          final userName = userData['name'] ?? '';
+
+          print(
+              'Processing user: $userName ($phone) - Status: $currentStatus, Email: $userEmail');
+
+          if (userEmail.isEmpty || !userEmail.contains('@')) {
+            print('Invalid email for user $userName: $userEmail');
+            failCount++;
+            failedEmails.add('$userName (invalid email)');
+            continue;
+          }
+
+          if (currentStatus == 'registered') {
+            try {
               await sendRegistrationEmail(
-                toEmail: userData['email'] ?? '',
-                participantName: userData['name'] ?? '',
+                toEmail: userEmail,
+                participantName: userName,
                 eventName: userData['event'] ?? '',
                 eventDate: userData['event_date'] ?? 'TBD',
               );
+              batch.update(docRef, {'status': 'waiting'});
               successCount++;
-            } else if (currentStatus == 'approved' && widget.status == 'approved') {
+              print('Successfully processed registration for: $userName');
+            } catch (emailError) {
+              print(
+                  'Failed to send registration email to $userName: $emailError');
+              failCount++;
+              failedEmails.add('$userName (email failed)');
+              errorMessages.add('Email failed for $userName: $emailError');
+            }
+          } else if (currentStatus == 'approved' &&
+              widget.status == 'approved') {
+            try {
               final qrUrl = await generateAndUploadQR(
                 phone,
                 'Event Ticket - ${userData['event'] ?? 'Unknown Event'}',
               );
               await sendQREmail(
-                toEmail: userData['email'] ?? '',
+                toEmail: userEmail,
                 qrUrl: qrUrl,
-                participantName: userData['name'] ?? '',
+                participantName: userName,
                 eventName: userData['event'] ?? '',
               );
               batch.update(docRef, {'status': 'completed'});
               successCount++;
+              print('Successfully processed QR email for: $userName');
+            } catch (emailError) {
+              print('Failed to send QR email to $userName: $emailError');
+              failCount++;
+              failedEmails.add('$userName (QR email failed)');
+              errorMessages.add('QR email failed for $userName: $emailError');
             }
+          } else {
+            print('User $userName has status $currentStatus - skipping');
           }
         } catch (e) {
           print('Error processing user $phone: $e');
           failCount++;
+          errorMessages.add('Processing error for $phone: $e');
         }
       }
 
-      await batch.commit();
+      if (successCount > 0) {
+        await batch.commit();
+        print('Batch committed successfully');
+      }
+
       Navigator.of(context).pop();
       toggleSelectionMode();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            successCount > 0
-                ? '✅ $successCount users processed and emails sent${failCount > 0 ? '. $failCount failed.' : '.'}'
-                : '❌ Failed to process all selected users.',
+      if (successCount > 0 && failCount == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+            Text('✅ Successfully processed $successCount users and sent emails'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
-          backgroundColor: successCount > 0 ? Colors.green : Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+        );
+      } else if (successCount > 0 && failCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '⚠️ Processed $successCount users successfully. $failCount failed.\nFailed: ${failedEmails.join(', ')}',
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'Details',
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Processing Results'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('✅ Successful: $successCount'),
+                          Text('❌ Failed: $failCount'),
+                          if (errorMessages.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            const Text('Error Details:',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            ...errorMessages.map((msg) => Text('• $msg',
+                                style: const TextStyle(fontSize: 12))),
+                          ],
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '❌ Failed to process all selected users.\nReasons: ${errorMessages.take(3).join(', ')}${errorMessages.length > 3 ? '...' : ''}',
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     } catch (e) {
+      print('Critical error in approveSelectedUsers: $e');
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Error: ${e.toString()}'),
+          content: Text('❌ Critical error: ${e.toString()}'),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -380,7 +682,7 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
       final androidInfo = await deviceInfo.androidInfo;
 
       if (androidInfo.version.sdkInt >= 33) {
-        return true; // No special permissions needed for app-specific directories
+        return true;
       } else if (androidInfo.version.sdkInt >= 30) {
         try {
           var status = await Permission.manageExternalStorage.status;
@@ -409,7 +711,7 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
         return status.isGranted;
       }
     }
-    return true; // iOS doesn't need explicit permission
+    return true;
   }
 
   Future<bool> _showPermissionDialog() async {
@@ -497,7 +799,8 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
           return {
             'path': externalDir.path,
             'location': 'App storage folder',
-            'instructions': 'File Manager > Android > data > com.yourapp.name > files',
+            'instructions':
+            'File Manager > Android > data > com.yourapp.name > files',
           };
         }
       } catch (e) {
@@ -522,13 +825,19 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
 
   Future<void> exportToExcel(List<Participant> participantsToExport) async {
     try {
-      // Show brief loading
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Preparing Excel file...'),
           duration: Duration(seconds: 1),
         ),
       );
+
+      // Maintain the same order as UI (newest first, completed last)
+      participantsToExport.sort((a, b) {
+        if (a.status == 'completed' && b.status != 'completed') return 1;
+        if (a.status != 'completed' && b.status == 'completed') return -1;
+        return b.timestamp.compareTo(a.timestamp);
+      });
 
       final excel = ExcelLib.Excel.createExcel();
       excel.delete('Sheet1');
@@ -554,7 +863,7 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
           ExcelLib.TextCellValue(p.event),
           ExcelLib.TextCellValue(p.phone),
           ExcelLib.TextCellValue(p.email),
-          ExcelLib.TextCellValue(p.age),
+          ExcelLib.TextCellValue(p.age ?? ''),
           ExcelLib.TextCellValue(p.dob),
           ExcelLib.TextCellValue(p.gender),
           ExcelLib.TextCellValue(p.status),
@@ -569,7 +878,6 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
       final file = File(outputPath);
       await file.writeAsBytes(excel.encode()!);
 
-      // Try copying to Downloads in background
       if (Platform.isAndroid && await _requestStoragePermission()) {
         _copyToDownloadsInBackground(file, fileName);
       }
@@ -606,7 +914,8 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
     }
   }
 
-  Future<void> _copyToDownloadsInBackground(File sourceFile, String fileName) async {
+  Future<void> _copyToDownloadsInBackground(
+      File sourceFile, String fileName) async {
     try {
       if (Platform.isAndroid) {
         final downloadsDir = Directory('/storage/emulated/0/Download');
@@ -630,110 +939,177 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
   }
 
   void showFilterPopup() {
+    final screenWidth = MediaQuery.of(context).size.width;
+
     showDialog(
       context: context,
-      builder: (context) => LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (context) => Dialog(
+        insetPadding: EdgeInsets.all(screenWidth * 0.04),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: screenWidth * 0.9,
+            maxHeight: screenWidth * 1.2,
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(screenWidth * 0.04),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Flexible(
-                  child: Text(
-                    'Filter',
-                    style: TextStyle(fontSize: width * 0.045),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: width * 0.85),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    TextField(
-                      decoration: const InputDecoration(labelText: 'Name'),
-                      onChanged: (value) => filterName = value.toLowerCase(),
-                      style: TextStyle(fontSize: width * 0.035),
+                    Text(
+                      'Filter',
+                      style: TextStyle(
+                        fontSize: screenWidth * 0.045,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    TextField(
-                      decoration: const InputDecoration(labelText: 'Age'),
-                      onChanged: (value) => filterAge = value,
-                      style: TextStyle(fontSize: width * 0.035),
-                    ),
-                    DropdownButtonFormField<String>(
-                      value: filterEvent.isEmpty ? null : filterEvent,
-                      decoration: const InputDecoration(labelText: 'Event'),
-                      items: [
-                        'Bangalore Open',
-                        'Chennai Chess Champion',
-                        'Chennai Chess',
-                      ].map((event) => DropdownMenuItem(value: event, child: Text(event))).toList(),
-                      onChanged: (value) => filterEvent = value ?? '',
-                      style: TextStyle(fontSize: width * 0.035),
+                    IconButton(
+                      icon: Icon(Icons.close, size: screenWidth * 0.05),
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
-              ),
+                SizedBox(height: screenWidth * 0.04),
+                TextField(
+                  decoration: InputDecoration(
+                    labelText: 'Name',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: screenWidth * 0.04,
+                      vertical: screenWidth * 0.035,
+                    ),
+                  ),
+                  onChanged: (value) => filterName = value.toLowerCase(),
+                  style: TextStyle(fontSize: screenWidth * 0.04),
+                ),
+                SizedBox(height: screenWidth * 0.04),
+                TextField(
+                  decoration: InputDecoration(
+                    labelText: 'Age',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: screenWidth * 0.04,
+                      vertical: screenWidth * 0.035,
+                    ),
+                  ),
+                  onChanged: (value) => filterAge = value,
+                  style: TextStyle(fontSize: screenWidth * 0.04),
+                ),
+                SizedBox(height: screenWidth * 0.04),
+                DropdownButtonFormField<String>(
+                  value: filterEvent.isEmpty ? null : filterEvent,
+                  decoration: InputDecoration(
+                    labelText: 'Event',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: screenWidth * 0.04,
+                      vertical: screenWidth * 0.035,
+                    ),
+                  ),
+                  items: [
+                    'Bangalore Open',
+                    'Delhi',
+                    'Chennai Chess',
+                  ]
+                      .map((event) => DropdownMenuItem(
+                    value: event,
+                    child: Text(
+                      event,
+                      style: TextStyle(fontSize: screenWidth * 0.04,color: Colors.black),
+                    ),
+                  ))
+                      .toList(),
+                  onChanged: (value) => filterEvent = value ?? '',
+                  style: TextStyle(fontSize: screenWidth * 0.04),
+                ),
+                SizedBox(height: screenWidth * 0.06),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            filterName = '';
+                            filterAge = '';
+                            filterEvent = '';
+                            _applySearch();
+                          });
+                          Navigator.of(context).pop();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                              vertical: screenWidth * 0.035),
+                        ),
+                        child: Text(
+                          'Clear',
+                          style: TextStyle(fontSize: screenWidth * 0.04),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: screenWidth * 0.04),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() => _applySearch());
+                          Navigator.of(context).pop();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          padding: EdgeInsets.symmetric(
+                              vertical: screenWidth * 0.035),
+                        ),
+                        child: Text(
+                          'Filter',
+                          style: TextStyle(
+                              fontSize: screenWidth * 0.04, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  if (mounted) {
-                    setState(() {
-                      filterName = '';
-                      filterAge = '';
-                      filterEvent = '';
-                      _applySearch();
-                    });
-                  }
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Clear'),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-                onPressed: () {
-                  if (mounted) {
-                    setState(() => _applySearch());
-                  }
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Filter', style: TextStyle(color: Colors.white)),
-              ),
-            ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 
   void _confirmDelete(String name, String phone) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text('Confirm Delete'),
-        content: Text("Are you sure you want to delete '$name'?"),
+        title: Text(
+          'Confirm Delete',
+          style: TextStyle(fontSize: screenWidth * 0.045),
+        ),
+        content: Text("Are you sure you want to delete '$name'?",
+            style: TextStyle(fontSize: screenWidth * 0.04)),
         actions: [
           TextButton(
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: TextStyle(fontSize: screenWidth * 0.04)),
             onPressed: () => Navigator.of(context).pop(),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            child: Text('Delete',
+                style: TextStyle(
+                    fontSize: screenWidth * 0.04, color: Colors.white)),
             onPressed: () async {
               try {
-                await FirebaseFirestore.instance.collection('users').doc(phone).delete();
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(phone)
+                    .delete();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Participant deleted')),
@@ -757,12 +1133,19 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
   @override
   void dispose() {
     _subscription?.cancel();
+    _loginSubscription?.cancel();
     _debounce?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final screenWidth = screenSize.width;
+    final screenHeight = screenSize.height;
+    final isPortrait = screenHeight > screenWidth;
+    final isSmallScreen = screenWidth < 600;
+
     return WillPopScope(
       onWillPop: () async {
         if (selectionMode) {
@@ -775,226 +1158,271 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
         backgroundColor: Colors.grey[100],
         appBar: AppBar(
           backgroundColor: Colors.blue,
+          automaticallyImplyLeading: false,
           elevation: 0,
-          leading: LayoutBuilder(
-            builder: (context, constraints) => IconButton(
-              icon: Icon(Icons.arrow_back, color: Colors.white, size: constraints.maxWidth * 0.06),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          title: Text(
-            "${widget.status[0].toUpperCase()}${widget.status.substring(1)} Participants",
-            style: TextStyle(fontSize: MediaQuery.of(context).size.width * 0.045),
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                Icons.filter_list,
-                color: Colors.white,
-                size: MediaQuery.of(context).size.width * 0.05,
-              ),
-              onPressed: showFilterPopup,
-            ),
-          ],
-        ),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final height = constraints.maxHeight;
-            return Column(
-              children: [
-                _buildHeader(width, height),
-                SizedBox(height: height * 0.01),
-                Expanded(
-                  child: isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : filteredParticipants.isEmpty
-                      ? const Center(child: Text('No participants found'))
-                      : Container(
-                    margin: EdgeInsets.symmetric(horizontal: width * 0.04),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(width * 0.02),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _tableHeader(width),
-                        Expanded(
-                          child: ListView.builder(
-                            physics: const ClampingScrollPhysics(),
-                            itemCount: showAllParticipants
-                                ? filteredParticipants.length
-                                : (filteredParticipants.length > 6
-                                ? 7
-                                : filteredParticipants.length),
-                            itemBuilder: (context, index) {
-                              if (!showAllParticipants &&
-                                  index == 6 &&
-                                  filteredParticipants.length > 6) {
-                                return Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: width * 0.04,
-                                    vertical: height * 0.02,
-                                  ),
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      if (mounted) {
-                                        setState(() => showAllParticipants = true);
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blue,
-                                      minimumSize: Size(double.infinity, height * 0.07),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(25),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'View more',
-                                      style: TextStyle(
-                                        fontSize: width * 0.04,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                              return _buildParticipantRow(filteredParticipants[index], width);
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(double width, double height) {
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.all(width * 0.04),
-      child: Column(
-        children: [
-          Row(
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: width * 0.03,
-                  vertical: height * 0.008,
+              Image.asset(
+                'assets/images/adminheadlogo.png',
+                height: isPortrait ? screenHeight * 0.045 : screenWidth * 0.045,
+              ),
+              Text(
+                "Admin",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallScreen ? screenWidth * 0.04 : screenWidth * 0.035,
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(20),
+              ),
+            ],
+          ),
+        ),
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: screenHeight,
+                  minWidth: screenWidth,
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    Icon(Icons.casino, color: Colors.white, size: width * 0.045),
-                    SizedBox(width: width * 0.01),
-                    Text(
-                      'Queens',
-                      style: TextStyle(
+                    _buildHeader(screenWidth, screenHeight),
+                    SizedBox(height: screenHeight * 0.01),
+                    isLoading
+                        ? SizedBox(
+                      height: screenHeight * 0.6,
+                      child: const Center(child: CircularProgressIndicator()),
+                    )
+                        : filteredParticipants.isEmpty
+                        ? SizedBox(
+                      height: screenHeight * 0.6,
+                      child: const Center(child: Text('No participants found')),
+                    )
+                        : Container(
+                      margin: EdgeInsets.symmetric(
+                          horizontal: screenWidth * 0.04),
+                      decoration: BoxDecoration(
                         color: Colors.white,
-                        fontSize: width * 0.04,
-                        fontWeight: FontWeight.bold,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                    ),
-                    Text(
-                      'Gambit',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: width * 0.035,
+                      child: Column(
+                        children: [
+                          _tableHeader(screenWidth, isSmallScreen),
+                          SizedBox(
+                            height: screenHeight * (isPortrait ? 0.5 : 0.7),
+                            child: ListView.builder(
+                              physics: const ClampingScrollPhysics(),
+                              itemCount: showAllParticipants
+                                  ? filteredParticipants.length
+                                  : (filteredParticipants.length > 6
+                                  ? 7
+                                  : filteredParticipants.length),
+                              itemBuilder: (context, index) {
+                                if (!showAllParticipants &&
+                                    index == 6 &&
+                                    filteredParticipants.length > 6) {
+                                  return Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: screenWidth * 0.04,
+                                      vertical: screenHeight * 0.02,
+                                    ),
+                                    child: ElevatedButton(
+                                      onPressed: () => setState(
+                                              () => showAllParticipants = true),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue,
+                                        minimumSize: Size(
+                                            double.infinity,
+                                            screenHeight * 0.06),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                          BorderRadius.circular(25),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'View more',
+                                        style: TextStyle(
+                                          fontSize: isSmallScreen
+                                              ? screenWidth * 0.04
+                                              : 16,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return _buildParticipantRow(
+                                    filteredParticipants[index],
+                                    screenWidth,
+                                    isSmallScreen);
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              const Spacer(),
-              Text(
-                'HI ADMIN',
-                style: TextStyle(
-                  fontSize: width * 0.035,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
+            ),
+            if (showNotificationDropdown)
+              Positioned(
+                top: screenHeight * 0.12,
+                right: screenWidth * 0.04,
+                child: _buildNotificationDropdown(screenWidth, screenHeight),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(double screenWidth, double screenHeight) {
+    final isSmallScreen = screenWidth < 600;
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.all(screenWidth * 0.04),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: Icon(Icons.arrow_back,
+                    color: Colors.black, size: screenWidth * 0.06),
+                onPressed: () => Navigator.pop(context),
+              ),
+              Expanded(
+                child: Text(
+                  "${widget.status[0].toUpperCase()}${widget.status.substring(1)} Participants",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? screenWidth * 0.045 : screenWidth * 0.04,
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              SizedBox(width: width * 0.02),
-              CircleAvatar(
-                backgroundColor: Colors.blue,
-                radius: width * 0.04,
-                child: Icon(
-                  Icons.notifications,
-                  color: Colors.white,
-                  size: width * 0.05,
+              GestureDetector(
+                onTap: _toggleNotificationDropdown,
+                child: Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.blue,
+                      radius: screenWidth * 0.045,
+                      child: Icon(Icons.notifications,
+                          color: Colors.white, size: screenWidth * 0.05),
+                    ),
+                    if (notificationCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          child: Text(
+                            notificationCount > 99
+                                ? '99+'
+                                : notificationCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
           ),
-          SizedBox(height: height * 0.02),
-          TextField(
-            onChanged: updateSearch,
-            decoration: InputDecoration(
-              hintText: 'Search by name',
-              prefixIcon: const Icon(Icons.search, color: Colors.grey),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(25),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              filled: true,
-              fillColor: Colors.grey[100],
-              contentPadding: EdgeInsets.symmetric(
-                vertical: height * 0.015,
-                horizontal: width * 0.04,
-              ),
-            ),
-            style: TextStyle(fontSize: width * 0.035),
-          ),
-          SizedBox(height: height * 0.02),
+          SizedBox(height: screenHeight * 0.02),
           Row(
             children: [
               Expanded(
-                child: Text(
-                  '${widget.status[0].toUpperCase()}${widget.status.substring(1)} participants',
-                  style: TextStyle(
-                    fontSize: width * 0.04,
-                    fontWeight: FontWeight.w600,
+                child: TextField(
+                  onChanged: updateSearch,
+                  decoration: InputDecoration(
+                    hintText: 'Search by name',
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    contentPadding: EdgeInsets.symmetric(
+                      vertical: screenHeight * 0.015,
+                      horizontal: screenWidth * 0.04,
+                    ),
                   ),
+                  style: TextStyle(fontSize: screenWidth * 0.04),
                 ),
               ),
-              GestureDetector(
-                onTap: selectionMode ? approveSelectedUsers : toggleSelectionMode,
-                child: _tagButton(
-                  selectionMode ? 'Approve & Email' : 'Select',
-                  Colors.white,
-                  Colors.blue,
-                ),
+              SizedBox(width: screenWidth * 0.02),
+              IconButton(
+                icon: Icon(Icons.filter_list, size: screenWidth * 0.06),
+                onPressed: showFilterPopup,
               ),
-              SizedBox(width: width * 0.02),
-              GestureDetector(
-                onTap: () async {
-                  final participantsToExport = selectionMode
-                      ? allParticipants.where((p) => selectedPhones.contains(p.phone)).toList()
-                      : allParticipants;
-                  await exportToExcel(participantsToExport);
-                },
-                child: _tagButton(
-                  'Export',
-                  Colors.blue,
-                  Colors.transparent,
-                  border: Colors.blue,
-                ),
+            ],
+          ),
+          SizedBox(height: screenHeight * 0.02),
+          Row(mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Wrap(
+                spacing: screenWidth * 0.02,
+                runSpacing: screenHeight * 0.015,
+                alignment: WrapAlignment.end,
+                children: [
+
+
+                  GestureDetector(
+                    onTap: selectionMode ? approveSelectedUsers : toggleSelectionMode,
+                    child: _tagButton(
+                      selectionMode ? 'Approve' : 'Select',
+                      Colors.white,
+                      Colors.blue,
+                      screenWidth,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () async {
+                      final participantsToExport = selectionMode
+                          ? allParticipants
+                          .where((p) => selectedPhones.contains(p.phone))
+                          .toList()
+                          : allParticipants;
+                      await exportToExcel(participantsToExport);
+                    },
+                    child: _tagButton(
+                      'Export',
+                      Colors.blue,
+                      Colors.transparent,
+                      screenWidth,
+                      border: Colors.blue,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1003,17 +1431,17 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
     );
   }
 
-  Widget _tableHeader(double width) {
+  Widget _tableHeader(double screenWidth, bool isSmallScreen) {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.blue,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(width * 0.02)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
       ),
       child: Row(
         children: [
           if (selectionMode)
-            Expanded(
-              flex: 1,
+            SizedBox(
+              width: screenWidth * 0.1,
               child: Checkbox(
                 value: allUsersSelected(),
                 onChanged: (_) => selectAllUsers(),
@@ -1021,17 +1449,17 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
                 activeColor: Colors.white,
               ),
             ),
-          Expanded(
-            flex: 1,
+          SizedBox(
+            width: screenWidth * 0.1,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: screenWidth * 0.035),
               child: Text(
-                'Serial no',
-                textAlign: TextAlign.end,
+                'S.No',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: width * 0.035,
+                  fontSize: isSmallScreen ? screenWidth * 0.035 : screenWidth * 0.03,
                 ),
               ),
             ),
@@ -1039,29 +1467,14 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
           Expanded(
             flex: 3,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: screenWidth * 0.035),
               child: Text(
                 'Name',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: width * 0.035,
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(
-                'Events',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: width * 0.035,
+                  fontSize: isSmallScreen ? screenWidth * 0.035 : screenWidth * 0.03,
                 ),
               ),
             ),
@@ -1069,14 +1482,29 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
           Expanded(
             flex: 2,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(vertical: screenWidth * 0.035),
+              child: Text(
+                'Event',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: isSmallScreen ? screenWidth * 0.035 : screenWidth * 0.03,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: screenWidth * 0.2,
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: screenWidth * 0.035),
               child: Text(
                 'Action',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: width * 0.035,
+                  fontSize: isSmallScreen ? screenWidth * 0.035 : screenWidth * 0.03,
                 ),
               ),
             ),
@@ -1086,7 +1514,8 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
     );
   }
 
-  Widget _buildParticipantRow(Participant p, double width) {
+  Widget _buildParticipantRow(
+      Participant p, double screenWidth, bool isSmallScreen) {
     final bgColor = p.status == 'completed' && widget.status == 'approved'
         ? const Color(0xFFE0E0E0)
         : Colors.white;
@@ -1099,111 +1528,76 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
       child: Row(
         children: [
           if (selectionMode && p.status != 'completed')
-            Expanded(
-              flex: 1,
+            SizedBox(
+              width: screenWidth * 0.1,
               child: Checkbox(
                 value: selectedPhones.contains(p.phone),
                 onChanged: (_) => togglePhoneSelection(p.phone),
               ),
-            )
-          else
-            const Expanded(flex: 1, child: SizedBox()),
-          Expanded(
-            flex: 1,
+            ),
+          SizedBox(
+            width: screenWidth * 0.1,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 1),
+              padding: EdgeInsets.symmetric(vertical: screenWidth * 0.03),
               child: Text(
                 p.sNo.toString(),
-                textAlign: TextAlign.start,
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: width * 0.035,
+                  fontSize: isSmallScreen ? screenWidth * 0.035 : screenWidth * 0.03,
                   fontWeight: FontWeight.w500,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
           Expanded(
             flex: 3,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+              padding: EdgeInsets.symmetric(
+                  vertical: screenWidth * 0.03, horizontal: screenWidth * 0.01),
               child: Text(
                 p.name,
-                textAlign: TextAlign.start,
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: width * 0.035,
+                  fontSize: isSmallScreen ? screenWidth * 0.035 : screenWidth * 0.03,
                   fontWeight: FontWeight.w500,
                 ),
                 overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-              child: Text(
-                p.event,
-                textAlign: TextAlign.start,
-                style: TextStyle(
-                  fontSize: width * 0.035,
-                  fontWeight: FontWeight.w500,
-                ),
-                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
               ),
             ),
           ),
           Expanded(
             flex: 2,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: EdgeInsets.symmetric(
+                  vertical: screenWidth * 0.03, horizontal: screenWidth * 0.01),
+              child: Text(
+                p.event,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isSmallScreen ? screenWidth * 0.035 : screenWidth * 0.03,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: screenWidth * 0.2,
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: screenWidth * 0.03),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  GestureDetector(
-                    onTap: () async {
-                      try {
-                        final doc = await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(p.phone)
-                            .get();
-                        if (doc.exists && mounted) {
-                          final userData = doc.data()!;
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => UserDetailScreen(
-                                userData: {
-                                  'name': p.name,
-                                  'event': p.event,
-                                  'phone_number': p.phone,
-                                  'email': p.email,
-                                  'age': p.age,
-                                  'dob': p.dob,
-                                  'gender': p.gender,
-                                  'status': p.status,
-                                  'event_date': p.eventDate,
-                                },
-                              ),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Failed to fetch user details')),
-                          );
-                        }
-                      }
-                    },
-                    child: _iconBtn(Icons.visibility, Colors.blue),
-                  ),
+                  _iconBtn(Icons.visibility, Colors.blue, screenWidth, () {
+                    _viewParticipantDetails(p);
+                  }),
                   if (widget.status != 'approved') ...[
-                    SizedBox(width: width * 0.02),
-                    GestureDetector(
-                      onTap: () => _confirmDelete(p.name, p.phone),
-                      child: _iconBtn(Icons.delete, Colors.red, filled: true),
-                    ),
+                    SizedBox(width: screenWidth * 0.02),
+                    _iconBtn(Icons.delete, Colors.red, screenWidth, () {
+                      _confirmDelete(p.name, p.phone);
+                    }),
                   ],
                 ],
               ),
@@ -1214,9 +1608,205 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
     );
   }
 
-  Widget _tagButton(String text, Color textColor, Color bgColor, {Color? border}) {
+  Widget _buildNotificationDropdown(double screenWidth, double screenHeight) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      width: screenWidth * 0.9,
+      constraints: BoxConstraints(maxHeight: screenHeight * 0.5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: EdgeInsets.all(screenWidth * 0.04),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Notifications",
+                  style: TextStyle(
+                    fontSize: screenWidth * 0.045,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.blue,
+                  ),
+                ),
+                Row(
+                  children: [
+                    if (notifications.isNotEmpty) ...[
+                      GestureDetector(
+                        onTap: _clearNotifications,
+                        child: Text(
+                          "Clear All",
+                          style: TextStyle(
+                            fontSize: screenWidth * 0.04,
+                            color: Colors.red,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: screenWidth * 0.03),
+                    ],
+                    GestureDetector(
+                      onTap: () => setState(() => showNotificationDropdown = false),
+                      child: Icon(Icons.close, size: screenWidth * 0.05, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (notifications.isEmpty)
+            Padding(
+              padding: EdgeInsets.all(screenWidth * 0.06),
+              child: Column(
+                children: [
+                  Icon(Icons.notifications_none,
+                      size: screenWidth * 0.12, color: Colors.grey[400]),
+                  SizedBox(height: screenHeight * 0.01),
+                  Text(
+                    "No new notifications",
+                    style: TextStyle(
+                      fontSize: screenWidth * 0.04,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: notifications.length,
+                itemBuilder: (context, index) {
+                  final notification = notifications[index];
+                  return Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: screenWidth * 0.04,
+                      vertical: screenHeight * 0.015,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.grey[200]!,
+                          width: 0.5,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(screenWidth * 0.02),
+                          decoration: BoxDecoration(
+                            color: notification.type == NotificationType.userLogin
+                                ? Colors.green.withOpacity(0.1)
+                                : Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Icon(
+                            notification.type == NotificationType.userLogin
+                                ? Icons.login
+                                : Icons.person_add,
+                            color: notification.type == NotificationType.userLogin
+                                ? Colors.green
+                                : Colors.blue,
+                            size: screenWidth * 0.05,
+                          ),
+                        ),
+                        SizedBox(width: screenWidth * 0.03),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                notification.message,
+                                style: TextStyle(
+                                  fontSize: screenWidth * 0.04,
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              SizedBox(height: screenHeight * 0.005),
+                              Text(
+                                _getTimeAgo(notification.timestamp),
+                                style: TextStyle(
+                                  fontSize: screenWidth * 0.035,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _viewParticipantDetails(Participant p) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(p.phone)
+          .get();
+      if (doc.exists && mounted) {
+        final userData = doc.data()!;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserDetailScreen(
+              userData: {
+                'name': p.name,
+                'event': p.event,
+                'phone_number': p.phone,
+                'email': p.email,
+                'age': p.age,
+                'dob': p.dob,
+                'gender': p.gender,
+                'status': p.status,
+                'event_date': p.eventDate,
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to fetch user details')),
+        );
+      }
+    }
+  }
+
+  Widget _tagButton(String text, Color textColor, Color bgColor,
+      double screenWidth, {
+        Color? border,
+      }) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+          horizontal: screenWidth * 0.03, vertical: screenWidth * 0.025),
       decoration: BoxDecoration(
         color: bgColor,
         border: Border.all(color: border ?? bgColor),
@@ -1227,45 +1817,24 @@ class _ParticipantsScreenState extends State<ParticipantsScreen> {
         style: TextStyle(
           color: textColor,
           fontWeight: FontWeight.w500,
-          fontSize: MediaQuery.of(context).size.width * 0.035,
+          fontSize: screenWidth * 0.035,
         ),
       ),
     );
   }
 
-  Widget _iconBtn(IconData icon, Color color, {bool filled = false}) {
-    return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: filled ? color.withOpacity(0.1) : null,
-        border: Border.all(color: color),
-        borderRadius: BorderRadius.circular(4),
+  Widget _iconBtn(
+      IconData icon, Color color, double screenWidth, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(screenWidth * 0.015),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Icon(icon, color: color, size: screenWidth * 0.045),
       ),
-      child: Icon(icon, color: color, size: 16),
     );
   }
-}class Participant {
-  int sNo;
-  final String name;
-  final String event;
-  final String phone;
-  final String email;
-  final String age;
-  final String dob;
-  final String gender;
-  final String status;
-  final String eventDate;
-
-  Participant({
-    required this.sNo,
-    required this.name,
-    required this.event,
-    required this.phone,
-    required this.email,
-    required this.age,
-    required this.dob,
-    required this.gender,
-    required this.status,
-    required this.eventDate,
-  });
 }

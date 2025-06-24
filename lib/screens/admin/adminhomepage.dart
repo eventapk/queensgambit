@@ -1,120 +1,143 @@
 import 'package:flutter/material.dart';
+import 'package:queens_gambit/screens/admin/eventFormScreen.dart';
 import 'participants_screen.dart';
 
 class AdminHomePage extends StatelessWidget {
-  final String adminEmail;
+  final String adminName;
 
-  const AdminHomePage({super.key, required this.adminEmail});
+  const AdminHomePage({super.key, required this.adminName});
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) async {
-        if (didPop) return;
+    final size = MediaQuery.of(context).size;
+    final width = size.width;
+    final height = size.height;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
-        final shouldExit = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Exit Admin Panel?'),
-            content: const Text('Do you really want to go back?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('No'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Yes'),
-              ),
-            ],
-          ),
-        ) ??
-            false;
-
-        if (shouldExit) {
-          Navigator.of(context).pop(); // this is how you exit with PopScope
-        }
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context);
+        return false;
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        appBar: AppBar(
-          backgroundColor: Colors.blue,
-          elevation: 0,
-          toolbarHeight: 0,
+        appBar: PreferredSize(
+          preferredSize: Size.fromHeight(height * 0.08),
+          child: AppBar(
+            backgroundColor: Colors.blue,
+            automaticallyImplyLeading: false,
+            elevation: 0,
+            title: Padding(
+              padding: EdgeInsets.symmetric(horizontal: width * 0.03),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Image.asset(
+                    'assets/images/adminheadlogo.png',
+                    height: height * 0.045,
+                  ),
+                  Text(
+                    adminName.toUpperCase(),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: width * 0.04,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
         body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          'HI ADMIN\n${adminEmail.toUpperCase()}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+          child: Padding(
+            padding: EdgeInsets.all(width * 0.04),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.arrow_back, size: width * 0.07),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                SizedBox(height: height * 0.01),
+                Expanded(
+                  child: isLandscape
+                      ? Row(
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: Image.asset(
+                            'assets/images/queen.jpg',
+                            width: width * 0.4,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.blue, width: 2),
+                      Expanded(
+                        child: _buildButtons(context, width, height),
                       ),
-                      child: const Icon(Icons.notifications_none, color: Colors.blue),
-                    ),
-                  ],
+                    ],
+                  )
+                      : Column(
+                    children: [
+                      Expanded(
+                        flex: 4,
+                        child: Center(
+                          child: Image.asset(
+                            'assets/images/queen.jpg',
+                            width: width * 0.6,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 5,
+                        child: _buildButtons(context, width, height),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Flexible(
-                flex: 3,
-                child: Image.asset(
-                  'assets/images/knight.png',
-                  width: MediaQuery.of(context).size.width * 0.6,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Flexible(
-                flex: 4,
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 30),
-                  shrinkWrap: true,
-                  children: [
-                    _buildButton(context, 'Registered participants', 'registered'),
-                    _buildButton(context, 'Waiting Participants', 'waiting'),
-                    _buildButton(context, 'Approved Participants', 'approved'),
-                    _buildButton(context, 'Form', 'form'),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildButton(BuildContext context, String label, String routeType) {
+  Widget _buildButtons(BuildContext context, double width, double height) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: width * 0.05),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildButton(context, 'Registered participants', 'registered', width, height),
+          _buildButton(context, 'Waiting Participants', 'waiting', width, height),
+          _buildButton(context, 'Approved Participants', 'approved', width, height),
+          _buildButton(context, 'Form', 'form', width, height),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildButton(
+      BuildContext context, String label, String routeType, double width, double height) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: height * 0.015),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.blue,
-          minimumSize: const Size.fromHeight(50),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          minimumSize: Size(width * 0.75, height * 0.06),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(width * 0.03),
+          ),
         ),
         onPressed: () {
           if (routeType == 'form') {
-            // TODO: Implement your form screen navigation
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => EventFormScreen()),
+            );
           } else {
             Navigator.push(
               context,
@@ -126,13 +149,13 @@ class AdminHomePage extends StatelessWidget {
         },
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.black87,
             fontWeight: FontWeight.bold,
+            fontSize: width * 0.04,
           ),
         ),
       ),
     );
   }
 }
-

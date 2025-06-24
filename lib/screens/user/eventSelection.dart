@@ -27,9 +27,9 @@ class _EventSelectionScreenState extends State<EventSelectionScreen> {
       "image": "assets/images/bangalore.jpg"
     },
     {
-      "name": "Chennai Chess Champion",
+      "name": "Delhi",
       "date": "10/07/2025",
-      "image": "assets/images/pondicherry.jpg"
+      "image": "assets/images/delhi.jpeg"
     },
   ];
 
@@ -44,6 +44,20 @@ class _EventSelectionScreenState extends State<EventSelectionScreen> {
     try {
       final selectedEvent = events[selectedEventIndex!];
       final phone = widget.userData['phone_number'];
+      final eventName = selectedEvent['name'];
+
+      // 🔁 Check for duplicate registration
+      final duplicateCheck = await FirebaseFirestore.instance
+          .collection('users')
+          .where('phone_number', isEqualTo: phone)
+          .get();
+
+      if (duplicateCheck.docs.isNotEmpty && !widget.isUpdateMode) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('You have already registered .')),
+        );
+        return;
+      }
 
       final docRef = FirebaseFirestore.instance.collection('users').doc(phone);
 
@@ -84,118 +98,188 @@ class _EventSelectionScreenState extends State<EventSelectionScreen> {
     final height = size.height;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text("Events", style: TextStyle(fontSize: width * 0.05)),
-        backgroundColor: primaryBlue,
-        foregroundColor: Colors.white,
-      ),
-      body: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: width * 0.04,
-          vertical: height * 0.02,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            buildTickStepper(width),
-            SizedBox(height: height * 0.04),
-            Expanded(
-              child: ListView.separated(
-                itemCount: events.length,
-                separatorBuilder: (_, __) => SizedBox(height: height * 0.02),
-                itemBuilder: (context, index) {
-                  final event = events[index];
-                  final isSelected = selectedEventIndex == index;
+      body: SafeArea(
+        child: MediaQuery.removeViewInsets(
+          removeBottom: true,
+          context: context,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                children: [
+                  // Header
+                  Container(
+                    width: double.infinity,
+                    color: primaryBlue,
+                    padding: EdgeInsets.only(
+                      top: height * 0.02,
+                      bottom: height * 0.015,
+                      left: width * 0.04,
+                    ),
+                    alignment: Alignment.centerLeft,
+                    child: Image.asset(
+                      'assets/images/adminheadlogo.png',
+                      width: width * 0.22,
+                    ),
+                  ),
 
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedEventIndex = index;
-                      });
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? primaryBlue.withOpacity(0.1)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isSelected ? primaryBlue : Colors.grey.shade300,
-                          width: isSelected ? 2 : 1,
+                  // App Bar Row
+                  Container(
+                    color: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: width * 0.04),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.arrow_back, color: Colors.black),
+                          onPressed: () => Navigator.pop(context),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            blurRadius: 6,
-                            offset: Offset(0, 3),
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              "Events",
+                              style: TextStyle(
+                                fontSize: width * 0.05,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
                           ),
-                        ],
+                        ),
+                        SizedBox(width: width * 0.12),
+                      ],
+                    ),
+                  ),
+
+                  // Main Content
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: width * 0.04,
+                        vertical: height * 0.02,
                       ),
-                      padding: EdgeInsets.all(width * 0.035),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.asset(
-                              event['image']!,
-                              width: width * 0.22,
-                              height: width * 0.22,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          SizedBox(width: width * 0.04),
+                          buildTickStepper(width),
+                          SizedBox(height: height * 0.03),
+
+                          // Event List
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  event['name']!,
-                                  style: TextStyle(
-                                    fontSize: width * 0.045,
-                                    fontWeight: FontWeight.w600,
+                            child: ListView.separated(
+                              physics: const BouncingScrollPhysics(),
+                              itemCount: events.length,
+                              separatorBuilder: (_, __) =>
+                                  SizedBox(height: height * 0.02),
+                              itemBuilder: (context, index) {
+                                final event = events[index];
+                                final isSelected =
+                                    selectedEventIndex == index;
+
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      selectedEventIndex = index;
+                                    });
+                                  },
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? primaryBlue.withOpacity(0.1)
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isSelected
+                                            ? primaryBlue
+                                            : Colors.grey.shade300,
+                                        width: isSelected ? 2 : 1,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.grey.withOpacity(0.1),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    padding: EdgeInsets.all(width * 0.035),
+                                    child: Row(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius:
+                                          BorderRadius.circular(10),
+                                          child: Image.asset(
+                                            event['image']!,
+                                            width: width * 0.22,
+                                            height: width * 0.22,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                        SizedBox(width: width * 0.04),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                event['name']!,
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: width * 0.045,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              SizedBox(height: 8),
+                                              Text(
+                                                event['date']!,
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: width * 0.035,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (isSelected)
+                                          Icon(Icons.check_circle,
+                                              color: Colors.green,
+                                              size: width * 0.06),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  event['date']!,
-                                  style: TextStyle(
-                                    fontSize: width * 0.035,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
                           ),
-                          if (isSelected)
-                            Icon(Icons.check_circle,
-                                color: Colors.green, size: width * 0.06),
+                          SizedBox(height: height * 0.015),
+
+                          // Register Button
+                          ElevatedButton(
+                            onPressed: () => registerUser(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryBlue,
+                              minimumSize: Size.fromHeight(height * 0.07),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              "Register",
+                              style: TextStyle(
+                                fontSize: width * 0.045,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-            SizedBox(height: height * 0.02),
-            ElevatedButton(
-              onPressed: () => registerUser(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBlue,
-                minimumSize: Size.fromHeight(height * 0.07),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text(
-                "Register",
-                style: TextStyle(
-                  fontSize: width * 0.045,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

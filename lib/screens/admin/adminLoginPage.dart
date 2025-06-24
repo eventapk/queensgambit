@@ -47,14 +47,15 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
       await Future.delayed(const Duration(milliseconds: 800));
 
-      Navigator.of(context).pop(); // Close the loading dialog
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AdminHomePage(adminName: username),
-        ),
-      );
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close the loading dialog
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AdminHomePage(adminName: username),
+          ),
+        );
+      }
     }
   }
 
@@ -72,8 +73,15 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         automaticallyImplyLeading: false,
         elevation: 0,
         title: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Image.asset('assets/images/adminheadlogo.png', height: height * 0.045),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: height * 0.045, maxWidth: width * 0.2),
+              child: Image.asset(
+                'assets/images/adminheadlogo.png',
+                fit: BoxFit.contain,
+              ),
+            ),
           ],
         ),
       ),
@@ -97,119 +105,127 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                 viewInsets > 0 ? viewInsets + height * 0.02 : height * 0.05,
               ),
               physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: height - viewInsets - kToolbarHeight,
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        iconSize: width * 0.07,
-                        onPressed: () {
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context);
-                          }
-                        },
-                      ),
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            'Login',
-                            style: TextStyle(
-                              fontSize: width * 0.07,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: width * 0.1),
-                    ],
-                  ),
-                  SizedBox(height: height * 0.015),
-                  Center(
-                    child: Text(
-                      'Manage events,\nregistrations, and payments \nfrom your dashboard',
-                      style: TextStyle(
-                        fontSize: width * 0.045,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  SizedBox(height: height * 0.035),
-                  Form(
-                    key: _formKey,
-                    child: Column(
-                      children: [
-                        _buildField(
-                          label: 'Username',
-                          controller: usernameController,
-                          errorText: usernameError,
-                          width: width,
-                          height: height,
-                        ),
-                        SizedBox(height: height * 0.02),
-                        _buildField(
-                          label: 'Email ID',
-                          controller: emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          width: width,
-                          height: height,
-                        ),
-                        SizedBox(height: height * 0.02),
-                        _buildField(
-                          label: 'Password',
-                          controller: passwordController,
-                          errorText: passwordError,
-                          obscure: true,
-                          width: width,
-                          height: height,
-                        ),
-                        SizedBox(height: height * 0.02),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () {},
-                            child: Text(
-                              'Forgot password?',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: width * 0.035,
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: height * 0.015),
-                        SizedBox(
-                          width: width * 0.5,
-                          height: height * 0.06,
-                          child: ElevatedButton(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            iconSize: width * 0.07,
                             onPressed: () {
-                              if (_formKey.currentState!.validate()) {
-                                validateLogin(context);
+                              if (Navigator.canPop(context)) {
+                                Navigator.pop(context);
                               }
                             },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
+                          ),
+                          Flexible(
                             child: Text(
                               'Login',
                               style: TextStyle(
-                                fontSize: width * 0.045,
+                                fontSize: width * 0.07,
+                                fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          SizedBox(width: width * 0.1),
+                        ],
+                      ),
+                      SizedBox(height: height * 0.015),
+                      Center(
+                        child: Text(
+                          'Manage events,\nregistrations, and payments \nfrom your dashboard',
+                          style: TextStyle(
+                            fontSize: width * 0.045,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                      ],
-                    ),
+                      ),
+                      SizedBox(height: height * 0.035),
+                      Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            _buildField(
+                              label: 'Username',
+                              controller: usernameController,
+                              errorText: usernameError,
+                              width: width,
+                              height: height,
+                            ),
+                            SizedBox(height: height * 0.02),
+                            _buildField(
+                              label: 'Email ID',
+                              controller: emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              width: width,
+                              height: height,
+                            ),
+                            SizedBox(height: height * 0.02),
+                            _buildField(
+                              label: 'Password',
+                              controller: passwordController,
+                              errorText: passwordError,
+                              obscure: true,
+                              width: width,
+                              height: height,
+                            ),
+                            SizedBox(height: height * 0.02),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {},
+                                child: Text(
+                                  'Forgot password?',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: width * 0.035,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: height * 0.015),
+                            SizedBox(
+                              width: width * 0.5,
+                              height: height * 0.06,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (_formKey.currentState!.validate()) {
+                                    validateLogin(context);
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Login',
+                                  style: TextStyle(
+                                    fontSize: width * 0.045,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ],

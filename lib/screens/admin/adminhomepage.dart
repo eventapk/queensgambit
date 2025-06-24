@@ -150,7 +150,7 @@ class AdminHomePage extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: Colors.black87,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: width * 0.04,
           ),

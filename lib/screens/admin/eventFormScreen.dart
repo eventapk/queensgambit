@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:queens_gambit/homePage.dart';
-import 'adminhomepage.dart'; // ✅ Adjust path if needed
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'adminhomepage.dart';
+
 
 class EventFormScreen extends StatefulWidget {
   const EventFormScreen({Key? key}) : super(key: key);
@@ -18,8 +21,13 @@ class _EventFormScreenState extends State<EventFormScreen> {
   final TextEditingController _mailContentController = TextEditingController();
   final TextEditingController _imageNameController = TextEditingController();
 
+  File? _pickedImage;
+  String? _uploadedImageUrl;
+
   bool _isUploading = false;
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   Future<void> _selectEventDate() async {
     final DateTime? picked = await showDatePicker(
@@ -34,6 +42,25 @@ class _EventFormScreenState extends State<EventFormScreen> {
     }
   }
 
+  Future<void> _pickImage() async {
+    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _pickedImage = File(pickedFile.path);
+        _imageNameController.text = pickedFile.name;
+      });
+    }
+  }
+
+  Future<String?> _uploadImageToFirebase(String eventId) async {
+    if (_pickedImage == null) return null;
+
+    final ref = _storage.ref().child('event_images/$eventId.jpg');
+    final uploadTask = ref.putFile(_pickedImage!);
+    final snapshot = await uploadTask;
+    return await snapshot.ref.getDownloadURL();
+  }
+
   Future<String> _generateEventId() async {
     final snapshot = await _firestore
         .collection('events')
@@ -45,21 +72,19 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
     final lastId = snapshot.docs.first['event_id'] as String;
     final numericPart = lastId.replaceAll('EVE', '').trim();
-    final number = int.tryParse(numericPart);
+    final number = int.tryParse(numericPart) ?? 0;
 
-    if (number == null) throw Exception('Invalid event_id format');
-
-    final newId = number + 1;
-    return 'EVE${newId.toString().padLeft(3, '0')}';
+    return 'EVE${(number + 1).toString().padLeft(3, '0')}';
   }
 
   Future<void> _uploadEvent() async {
     if (_eventNameController.text.isEmpty ||
         _eventDateController.text.isEmpty ||
         _mailSubController.text.isEmpty ||
-        _mailContentController.text.isEmpty) {
+        _mailContentController.text.isEmpty ||
+        _pickedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
+        const SnackBar(content: Text('Please fill all fields and upload an image')),
       );
       return;
     }
@@ -68,6 +93,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
     try {
       final eventId = await _generateEventId();
+      final imageUrl = await _uploadImageToFirebase(eventId);
 
       await _firestore.collection('events').doc(eventId).set({
         'event_id': eventId,
@@ -75,6 +101,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
         'event_date': _eventDateController.text,
         'mail_subject': _mailSubController.text,
         'mail_content': _mailContentController.text,
+        'image_url': imageUrl,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -98,6 +125,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
     _mailSubController.clear();
     _mailContentController.clear();
     _imageNameController.clear();
+    _pickedImage = null;
+    _uploadedImageUrl = null;
   }
 
   InputDecoration _inputDecoration({String? hintText}) {
@@ -129,55 +158,60 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final screenWidth = screenSize.width;
+    final screenHeight = screenSize.height;
+    final isSmallScreen = screenWidth < 600;
+    final horizontalPadding = isSmallScreen ? screenWidth * 0.04 : screenWidth * 0.035;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.blue,
         elevation: 0,
-        titleSpacing: 0,
         automaticallyImplyLeading: false,
         title: Row(
           children: [
             const SizedBox(width: 10),
             Image.asset('assets/images/adminheadlogo.png', height: 32),
             const Spacer(),
-            const Text(
-              'Admin',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            Text(
+              'ADMIN',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold,fontSize: isSmallScreen ? screenWidth * 0.04 : screenWidth * 0.035),
             ),
             const SizedBox(width: 16),
           ],
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => AdminHomePage
-                        ( adminName: '',)),
-                    );
-                  },
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => AdminHomePage(adminName: '')),
+                      );
+                    },
+                  ),
                 ),
                 Expanded(
-                  child: Center(
-                    child: Text(
-                      'Form',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Event Form',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
-                const SizedBox(width: 48),
+                const SizedBox(width: 48), // Placeholder
               ],
             ),
 
@@ -185,11 +219,9 @@ class _EventFormScreenState extends State<EventFormScreen> {
             TextField(
               controller: _eventNameController,
               inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                  RegExp(r"[a-zA-Z\s!@#\$&*~(),.?:;'\\-]"),
-                ),
+                FilteringTextInputFormatter.allow(RegExp(r"[a-zA-Z\s!@#\$&*~(),.?:;'\\-]")),
               ],
-              decoration: _inputDecoration(),
+              decoration: _inputDecoration(hintText: "Enter Event Name"),
             ),
 
             buildLabel("Event Date"),
@@ -197,7 +229,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
               controller: _eventDateController,
               readOnly: true,
               onTap: _selectEventDate,
-              decoration: _inputDecoration(),
+              decoration: _inputDecoration(hintText: "Choose Event Date"),
             ),
 
             buildLabel("Event Image"),
@@ -210,9 +242,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
             Align(
               alignment: Alignment.centerRight,
               child: ElevatedButton(
-                onPressed: () {
-                  // image picker logic
-                },
+                onPressed: _pickImage,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -225,18 +255,14 @@ class _EventFormScreenState extends State<EventFormScreen> {
             buildLabel("Mail Subject"),
             TextField(
               controller: _mailSubController,
-              decoration: _inputDecoration(
-                hintText: "Email subject for registration confirmation",
-              ),
+              decoration: _inputDecoration(hintText: "Email subject for registration confirmation"),
             ),
 
             buildLabel("Mail Content"),
             TextField(
               controller: _mailContentController,
               maxLines: 5,
-              decoration: _inputDecoration(
-                hintText: "Email body sent to user after registration",
-              ),
+              decoration: _inputDecoration(hintText: "Email body sent to user after registration"),
             ),
 
             const SizedBox(height: 24),
@@ -250,7 +276,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
                 ),
                 child: _isUploading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Upload", style: TextStyle(color: Colors.white)),
+                    : const Text("Submit", style: TextStyle(color: Colors.white)),
               ),
             ),
           ],

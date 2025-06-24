@@ -176,6 +176,9 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
           if (value == null || value.trim().isEmpty) {
             return "Please enter your $label";
           }
+          if (label == "Name" && !RegExp(r"^[a-zA-Z\s]+$").hasMatch(value.trim())) {
+            return "Name should contain only letters and spaces";
+          }
           return null;
         },
         decoration: InputDecoration(

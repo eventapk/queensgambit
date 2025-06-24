@@ -15,12 +15,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _dobController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-
   String? _selectedGender;
   String? _fullPhoneNumber;
   bool _isGenderDropdownOpen = false;
-  bool _showGenderError = false;
-  bool _showPhoneError = false;
 
   @override
   void dispose() {
@@ -38,6 +35,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       initialDate: DateTime(2000),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
+      helpText: '',
     );
     if (picked != null) {
       setState(() {
@@ -53,20 +51,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
       age--;
     }
-    _ageController.text = age.toString();
+    _ageController.text = age.clamp(0, 100).toString();
   }
 
   void _goToEventSelection() {
-    final isValidForm = _formKey.currentState!.validate();
-    final isPhoneValid = _fullPhoneNumber != null && _phoneController.text.length == 10;
-    final isGenderValid = _selectedGender != null;
+    final formValid = _formKey.currentState!.validate();
+    final genderValid = _selectedGender != null && _selectedGender!.isNotEmpty;
+    final phoneValid = _fullPhoneNumber != null && _fullPhoneNumber!.trim().isNotEmpty;
 
-    setState(() {
-      _showPhoneError = !isPhoneValid;
-      _showGenderError = !isGenderValid;
-    });
-
-    if (isValidForm && isPhoneValid && isGenderValid) {
+    if (formValid && genderValid && phoneValid) {
       _formKey.currentState!.save();
       final userData = {
         'name': _nameController.text.trim(),
@@ -79,20 +72,30 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => EventSelectionScreen(userData: userData, isUpdateMode: false),
+          builder: (context) => EventSelectionScreen(
+            userData: userData,
+            isUpdateMode: false,
+          ),
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields correctly')),
-      );
+      if (!genderValid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please select gender')),
+        );
+      } else if (!phoneValid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please enter a valid phone number')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
+    final size = MediaQuery.of(context).size;
+    final height = size.height;
+    final width = size.width;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -103,7 +106,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Image.asset('assets/images/adminheadlogo.png', height: height * 0.05),
+            Image.asset(
+              'assets/images/adminheadlogo.png',
+              height: height * 0.05,
+            ),
           ],
         ),
       ),
@@ -112,7 +118,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           SizedBox(height: height * 0.005),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: width * 0.05, vertical: height * 0.015),
+              padding: EdgeInsets.symmetric(horizontal: width * 0.05, vertical: height * 0.02),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -120,19 +126,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     Text(
                       'Registration',
                       style: TextStyle(
+                        color: Colors.black,
                         fontSize: height * 0.025,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
                       ),
                     ),
                     buildProgressBar(width),
                     SizedBox(height: height * 0.02),
-                    buildTextField('Name', _nameController, width, validateLettersOnly: true),
-                    buildTextField('DOB', _dobController, width, readOnly: true, onTap: _selectDate),
-                    buildTextField('Age', _ageController, width, readOnly: true),
-                    buildTextField('Email', _emailController, width, inputType: TextInputType.emailAddress),
+                    buildTextField(label: "Name", controller: _nameController, width: width),
+                    buildTextField(label: "DOB", controller: _dobController, width: width, readOnly: true, onTap: _selectDate),
+                    buildTextField(label: "Age", controller: _ageController, width: width, inputType: TextInputType.number, readOnly: true),
+                    buildTextField(label: "Email", controller: _emailController, width: width, inputType: TextInputType.emailAddress),
                     buildPhoneField(width),
-                    buildGenderDropdown(width),
+                    buildDropdownField(width),
                   ],
                 ),
               ),
@@ -145,9 +151,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               child: ElevatedButton(
                 onPressed: _goToEventSelection,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0090FF),
-                  padding: EdgeInsets.symmetric(vertical: height * 0.018),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: Color(0xFF0090FF),
+                  padding: EdgeInsets.symmetric(vertical: height * 0.02),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: Text(
                   "Next",
@@ -161,11 +169,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  Widget buildTextField(String label, TextEditingController controller, double width,
-      {TextInputType inputType = TextInputType.text,
-        bool readOnly = false,
-        VoidCallback? onTap,
-        bool validateLettersOnly = false}) {
+  Widget buildTextField({
+    required String label,
+    required TextEditingController controller,
+    required double width,
+    TextInputType inputType = TextInputType.text,
+    bool readOnly = false,
+    VoidCallback? onTap,
+  }) {
     return Padding(
       padding: EdgeInsets.only(bottom: width * 0.04),
       child: TextFormField(
@@ -173,15 +184,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         keyboardType: inputType,
         readOnly: readOnly,
         onTap: onTap,
-        style: TextStyle(fontSize: width * 0.04),
+        cursorColor: Color(0xFF0090FF),
         validator: (value) {
-          if (value == null || value.trim().isEmpty) return 'Enter $label';
-          if (label == 'Email' &&
-              !RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(value.trim())) {
-            return 'Enter a valid email';
+          if (value == null || value.trim().isEmpty) {
+            return "Please enter your ${label.replaceAll(':', '')}";
           }
-          if (validateLettersOnly && !RegExp(r'^[a-zA-Z ]+$').hasMatch(value.trim())) {
-            return 'Only letters allowed in $label';
+          if (label.toLowerCase().contains("name") && !RegExp(r'^[a-zA-Z\s]+$').hasMatch(value.trim())) {
+            return "Only alphabetic characters are allowed in ${label.replaceAll(':', '')}";
+          }
+          if (label.toLowerCase().contains("age") && int.tryParse(value.trim()) == null) {
+            return "Enter a valid number";
+          }
+          if (label.toLowerCase().contains("email")) {
+            final trimmedValue = value.trim();
+            if (!RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]+$').hasMatch(trimmedValue)) {
+              return "Please enter a valid email format";
+            }
           }
           return null;
         },
@@ -189,16 +207,19 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           label: RichText(
             text: TextSpan(
               text: label,
-              style: TextStyle(color: Colors.black, fontSize: width * 0.04),
-              children: [
-                TextSpan(
-                  text: ' *',
-                  style: TextStyle(color: Colors.red, fontSize: width * 0.04),
-                ),
-              ],
+              style: TextStyle(color: Colors.grey[700], fontSize: width * 0.04),
+              children: [TextSpan(text: ' *', style: TextStyle(color: Colors.red))],
             ),
           ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF0090FF)),
+            borderRadius: BorderRadius.circular(8),
+          ),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.blue[100]!),
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
       ),
     );
@@ -207,114 +228,113 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Widget buildPhoneField(double width) {
     return Padding(
       padding: EdgeInsets.only(bottom: width * 0.04),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IntlPhoneField(
-            controller: _phoneController,
-            initialCountryCode: 'IN',
-            decoration: InputDecoration(
-              counterText: "",
-              label: RichText(
-                text: TextSpan(
-                  text: 'Phone Number',
-                  style: TextStyle(color: Colors.black, fontSize: width * 0.04),
-                  children: [
-                    TextSpan(
-                      text: ' *',
-                      style: TextStyle(color: Colors.red, fontSize: width * 0.04),
-                    ),
-                  ],
-                ),
-              ),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onChanged: (phone) {
-              _fullPhoneNumber = phone.completeNumber;
-              if (phone.number.length == 10) {
-                setState(() => _showPhoneError = false);
-              }
-            },
+      child: IntlPhoneField(
+        controller: _phoneController,
+        decoration: InputDecoration(
+          helperText: '',
+          counterText: '',
+          labelText: 'Phone Number *',
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.blue[100]!),
+            borderRadius: BorderRadius.circular(8),
           ),
-          if (_showPhoneError)
-            Padding(
-              padding: const EdgeInsets.only(left: 8.0, top: 4),
-              child: Text(
-                'Enter valid 10-digit phone number',
-                style: TextStyle(color: Colors.red, fontSize: width * 0.035),
-              ),
-            ),
-        ],
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF0090FF)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        initialCountryCode: 'IN',
+        onChanged: (phone) => _fullPhoneNumber = phone.completeNumber,
+        onSaved: (phone) => _fullPhoneNumber = phone?.completeNumber,
+        validator: (phone) {
+          if (phone == null || phone.number.isEmpty) {
+            return 'Please enter your phone number';
+          }
+          if (phone.countryCode == '+91' && !RegExp(r'^\d{10}$').hasMatch(phone.number)) {
+            return 'Enter a valid 10-digit Indian phone number';
+          }
+          return null;
+        },
       ),
     );
   }
 
-  Widget buildGenderDropdown(double width) {
+  Widget buildDropdownField(double width) {
     return Padding(
       padding: EdgeInsets.only(bottom: width * 0.04),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          RichText(
-            text: TextSpan(
-              text: 'Gender',
-              style: TextStyle(color: Colors.black, fontSize: width * 0.04),
-              children: [
-                TextSpan(text: ' *', style: TextStyle(color: Colors.red)),
-              ],
+          Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 4),
+            child: RichText(
+              text: TextSpan(
+                text: "Gender",
+                style: TextStyle(color: Colors.grey[700], fontSize: width * 0.04),
+                children: [TextSpan(text: ' *', style: TextStyle(color: Colors.red))],
+              ),
             ),
           ),
-          SizedBox(height: 6),
           GestureDetector(
             onTap: () => setState(() => _isGenderDropdownOpen = !_isGenderDropdownOpen),
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: width * 0.04, vertical: width * 0.035),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.blueAccent),
+                border: Border.all(color: Colors.blue[100]!),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
                   Text(
                     _selectedGender ?? "Select Gender",
-                    style: TextStyle(fontSize: width * 0.04),
+                    style: TextStyle(fontSize: width * 0.04, color: _selectedGender == null ? Colors.grey[600] : Colors.black),
                   ),
                   Spacer(),
-                  Icon(_isGenderDropdownOpen ? Icons.arrow_drop_up : Icons.arrow_drop_down),
+                  Icon(_isGenderDropdownOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.blueAccent),
                 ],
               ),
             ),
           ),
-          if (_isGenderDropdownOpen)
+          if (_isGenderDropdownOpen) ...[
+            SizedBox(height: width * 0.02),
             Container(
-              margin: const EdgeInsets.only(top: 6),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.blueAccent),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[100]!),
               ),
               child: Column(
                 children: ['Female', 'Male', 'Others'].map((gender) {
-                  return ListTile(
-                    title: Text(gender, style: TextStyle(fontSize: width * 0.04)),
-                    onTap: () {
-                      setState(() {
-                        _selectedGender = gender;
-                        _isGenderDropdownOpen = false;
-                        _showGenderError = false;
-                      });
-                    },
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      _selectedGender = gender;
+                      _isGenderDropdownOpen = false;
+                    }),
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(horizontal: width * 0.04, vertical: width * 0.03),
+                      decoration: BoxDecoration(
+                        color: _selectedGender == gender ? Color(0xFF0090FF) : Colors.transparent,
+                        borderRadius: gender == 'Female'
+                            ? BorderRadius.vertical(top: Radius.circular(8))
+                            : gender == 'Others'
+                            ? BorderRadius.vertical(bottom: Radius.circular(8))
+                            : null,
+                      ),
+                      child: Text(
+                        gender,
+                        style: TextStyle(
+                          fontSize: width * 0.04,
+                          color: _selectedGender == gender ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ),
                   );
                 }).toList(),
               ),
             ),
-          if (_showGenderError)
-            Padding(
-              padding: const EdgeInsets.only(left: 8.0, top: 4),
-              child: Text(
-                'Select gender',
-                style: TextStyle(color: Colors.red, fontSize: width * 0.035),
-              ),
-            ),
+          ],
         ],
       ),
     );
@@ -322,21 +342,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Widget buildProgressBar(double width) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: width * 0.04),
+      padding: EdgeInsets.symmetric(horizontal: width * 0.0),
       child: Row(
         children: [
           Expanded(child: Container(height: 2, color: Colors.blue)),
           Container(
             width: width * 0.09,
             height: width * 0.09,
-            decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
             child: Icon(Icons.check, color: Colors.white, size: width * 0.06),
           ),
-          Expanded(child: Container(height: 2, color: Colors.blue[100]!)),
+          Expanded(child: Container(height: 2, color: Colors.blue[100])),
           Container(
             width: width * 0.065,
             height: width * 0.065,
-            decoration: const BoxDecoration(color: Color(0xFFE0E0E0), shape: BoxShape.circle),
+            decoration: BoxDecoration(color: Colors.blue[100], shape: BoxShape.circle),
           ),
         ],
       ),

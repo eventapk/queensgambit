@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -88,6 +89,8 @@ bool showNotificationDropdown = false;
 Set<String> previousUserIds = {};
 Set<String> previousLoginIds = {};
 StreamSubscription<QuerySnapshot>? _loginSubscription;
+bool _isApproving = false;
+bool _cancelApprove = false;
 
 static const serviceId = 'service_vgb2gw6';
 static const registrationTemplateId = 'template_bvs05a3';
@@ -99,6 +102,10 @@ void initState() {
 super.initState();
 listenToParticipants();
 listenToUserLogins();
+}
+
+void _cancelApproveProcess() {
+_cancelApprove = true;
 }
 
 void listenToParticipants() {
@@ -475,6 +482,11 @@ const SnackBar(content: Text('No users selected to approve.')),
 return;
 }
 
+setState(() {
+_isApproving = true;
+_cancelApprove = false;
+});
+
 showDialog(
 context: context,
 barrierDismissible: false,
@@ -504,6 +516,11 @@ List<String> failedEmails = [];
 List<String> errorMessages = [];
 
 for (final phone in selectedPhones) {
+if (_cancelApprove) {
+print('Approve process cancelled');
+break;
+}
+
 try {
 print('Processing user: $phone');
 final docRef = FirebaseFirestore.instance.collection('users').doc(phone);
@@ -578,12 +595,27 @@ errorMessages.add('Processing error for $phone: $e');
 }
 }
 
-if (successCount > 0) {
+if (successCount > 0 && !_cancelApprove) {
 await batch.commit();
 print('Batch committed successfully');
 }
 
-Navigator.of(context).pop();
+if (mounted) Navigator.of(context).pop();
+
+if (_cancelApprove) {
+if (mounted) {
+ScaffoldMessenger.of(context).showSnackBar(
+const SnackBar(
+content: Text('Approve process cancelled'),
+backgroundColor: Colors.orange,
+duration: Duration(seconds: 3),
+),
+);
+}
+toggleSelectionMode();
+return;
+}
+
 toggleSelectionMode();
 
 if (successCount > 0 && failCount == 0) {
@@ -649,7 +681,7 @@ duration: const Duration(seconds: 5),
 }
 } catch (e) {
 print('Critical error in approveSelectedUsers: $e');
-Navigator.of(context).pop();
+if (mounted) Navigator.of(context).pop();
 ScaffoldMessenger.of(context).showSnackBar(
 SnackBar(
 content: Text('❌ Critical error: ${e.toString()}'),
@@ -657,6 +689,11 @@ backgroundColor: Colors.red,
 duration: const Duration(seconds: 5),
 ),
 );
+} finally {
+setState(() {
+_isApproving = false;
+_cancelApprove = false;
+});
 }
 }
 
@@ -936,6 +973,7 @@ maxHeight: screenWidth * 1.2,
 ),
 child: Padding(
 padding: EdgeInsets.all(screenWidth * 0.04),
+child: SingleChildScrollView(
 child: Column(
 mainAxisSize: MainAxisSize.min,
 children: [
@@ -1054,6 +1092,7 @@ style: TextStyle(fontSize: screenWidth * 0.04, color: Colors.white),
 ),
 ),
 ),
+),
 );
 }
 
@@ -1145,6 +1184,40 @@ final isSmallScreen = screenWidth < 600;
 
 return WillPopScope(
 onWillPop: () async {
+if (_isApproving) {
+bool? confirmExit = await showDialog<bool>(
+context: context,
+builder: (context) => AlertDialog(
+shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+title: Text(
+'Exit Approval Process',
+style: TextStyle(fontSize: screenWidth * 0.045),
+),
+content: Text(
+'Approval process is in progress. Do you want to cancel and exit?',
+style: TextStyle(fontSize: screenWidth * 0.04),
+),
+actions: [
+TextButton(
+child: Text('Continue', style: TextStyle(fontSize: screenWidth * 0.04)),
+onPressed: () => Navigator.of(context).pop(false),
+),
+ElevatedButton(
+style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+child: Text(
+'Cancel & Exit',
+style: TextStyle(fontSize: screenWidth * 0.04, color: Colors.white),
+),
+onPressed: () {
+_cancelApproveProcess();
+Navigator.of(context).pop(true);
+},
+),
+],
+),
+);
+return confirmExit ?? false;
+}
 if (selectionMode) {
 toggleSelectionMode();
 return false;
@@ -1166,7 +1239,8 @@ height: isPortrait ? screenHeight * 0.045 : screenWidth * 0.045,
 ),
 Text(
 "ADMIN",
-style: TextStyle(fontWeight: FontWeight.bold,
+style: TextStyle(
+fontWeight: FontWeight.bold,
 color: Colors.white,
 fontSize: isSmallScreen ? screenWidth * 0.04 : screenWidth * 0.035,
 ),
@@ -1219,7 +1293,9 @@ child: ListView.builder(
 physics: const ClampingScrollPhysics(),
 itemCount: showAllParticipants
 ? filteredParticipants.length
-    : (filteredParticipants.length > 6 ? 7 : filteredParticipants.length),
+    : (filteredParticipants.length > 6
+? 7
+    : filteredParticipants.length),
 itemBuilder: (context, index) {
 if (!showAllParticipants &&
 index == 6 &&
@@ -1230,10 +1306,12 @@ horizontal: screenWidth * 0.04,
 vertical: screenHeight * 0.02,
 ),
 child: ElevatedButton(
-onPressed: () => setState(() => showAllParticipants = true),
+onPressed: () =>
+setState(() => showAllParticipants = true),
 style: ElevatedButton.styleFrom(
 backgroundColor: Colors.blue,
-minimumSize: Size(double.infinity, screenHeight * 0.06),
+minimumSize:
+Size(double.infinity, screenHeight * 0.06),
 shape: RoundedRectangleBorder(
 borderRadius: BorderRadius.circular(25),
 ),
@@ -1241,7 +1319,8 @@ borderRadius: BorderRadius.circular(25),
 child: Text(
 'View more',
 style: TextStyle(
-fontSize: isSmallScreen ? screenWidth * 0.04 : 16,
+fontSize:
+isSmallScreen ? screenWidth * 0.04 : 16,
 ),
 ),
 ),
@@ -1431,7 +1510,7 @@ activeColor: Colors.white,
 SizedBox(
 width: screenWidth * 0.1,
 child: Padding(
-padding: EdgeInsets.fromLTRB(2, screenWidth * 0.035, 0, screenWidth * 0.035), // Adjusted left padding to 2px
+padding: EdgeInsets.fromLTRB(2, screenWidth * 0.035, 0, screenWidth * 0.035),
 child: Text(
 'S.No',
 textAlign: TextAlign.center,
@@ -1516,7 +1595,7 @@ onChanged: (_) => togglePhoneSelection(p.phone),
 SizedBox(
 width: screenWidth * 0.1,
 child: Padding(
-padding: EdgeInsets.fromLTRB(2, screenWidth * 0.03, 0, screenWidth * 0.03), // Adjusted left padding to 2px
+padding: EdgeInsets.fromLTRB(2, screenWidth * 0.03, 0, screenWidth * 0.03),
 child: Text(
 p.sNo.toString(),
 textAlign: TextAlign.center,
@@ -1774,7 +1853,8 @@ const SnackBar(content: Text('Failed to fetch user details')),
 }
 }
 
-Widget _tagButton(String text, Color textColor, Color bgColor, double screenWidth, {Color? border}) {
+Widget _tagButton(String text, Color textColor, Color bgColor, double screenWidth,
+{Color? border}) {
 return Container(
 padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.03, vertical: screenWidth * 0.025),
 decoration: BoxDecoration(

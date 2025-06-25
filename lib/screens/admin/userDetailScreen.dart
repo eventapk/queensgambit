@@ -29,7 +29,7 @@ class UserDetailScreen extends StatelessWidget {
               children: [
                 const Center(
                   child: Text(
-                    'USER DETAIL',
+                    'USER DETAILS',
                     style: TextStyle(
                       color: Colors.grey,
                       fontSize: 16,
@@ -53,7 +53,7 @@ class UserDetailScreen extends StatelessWidget {
                 _buildInfoRow('Status:', userData['status'] ?? 'Pending', isStatus: true),
                 const SizedBox(height: 30),
                 const Text(
-                  'Event Information',
+                  'Event Details',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),

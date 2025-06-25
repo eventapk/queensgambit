@@ -281,6 +281,7 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
         elevation: 0,
         titleSpacing: 0,
         automaticallyImplyLeading: false,
+
         title: Row(
           children: [
             const SizedBox(width: 10),
@@ -294,6 +295,7 @@ class _ViewDetailsScreenState extends State<ViewDetailsScreen> {
           padding: EdgeInsets.symmetric(horizontal: width * 0.05, vertical: 20),
           child: Form(
             key: _formKey,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             child: Column(
               children: [
                 Row(

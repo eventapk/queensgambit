@@ -55,6 +55,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   void _goToEventSelection() {
+    ScaffoldMessenger.of(context).clearSnackBars(); // ✅ Fix: clear old SnackBars first
+
     final formValid = _formKey.currentState!.validate();
     final genderValid = _selectedGender != null && _selectedGender!.isNotEmpty;
     final phoneValid = _fullPhoneNumber != null && _fullPhoneNumber!.trim().isNotEmpty;
@@ -121,6 +123,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               padding: EdgeInsets.symmetric(horizontal: width * 0.05, vertical: height * 0.02),
               child: Form(
                 key: _formKey,
+                autovalidateMode: AutovalidateMode.disabled,
                 child: Column(
                   children: [
                     Text(

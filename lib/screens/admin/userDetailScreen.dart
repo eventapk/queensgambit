@@ -1,9 +1,28 @@
 import 'package:flutter/material.dart';
 
 class UserDetailScreen extends StatelessWidget {
-  final Map<String, dynamic> userData;
+  final String name;
+  final String event;
+  final String phone;
+  final String email;
+  final String? age;
+  final String dob;
+  final String gender;
+  final String status;
+  final String eventDate;
 
-  const UserDetailScreen({Key? key, required this.userData}) : super(key: key);
+  const UserDetailScreen({
+    Key? key,
+    required this.name,
+    required this.event,
+    required this.phone,
+    required this.email,
+    this.age,
+    required this.dob,
+    required this.gender,
+    required this.status,
+    required this.eventDate,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +36,10 @@ class UserDetailScreen extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'User Details',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
       body: SingleChildScrollView(
@@ -44,21 +67,22 @@ class UserDetailScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
-                _buildInfoRow('Name:', userData['name'] ?? ''),
-                _buildInfoRow('Date of Birth:', userData['dob'] ?? ''),
-                _buildInfoRow('Age:', userData['age'] ?? ''),
-                _buildInfoRow('Email ID:', userData['email'] ?? ''),
-                _buildInfoRow('Phone No:', userData['phone_number'] ?? ''),
-                _buildInfoRow('Gender:', userData['gender'] ?? ''),
-                _buildInfoRow('Status:', userData['status'] ?? 'Pending', isStatus: true),
+                _buildInfoRow('Name:', name),
+                _buildInfoRow('Date of Birth:', dob),
+                _buildInfoRow('Age:', age ?? 'N/A'),
+                _buildInfoRow('Email ID:', email),
+                _buildInfoRow('Phone No:', phone),
+                _buildInfoRow('Gender:', gender),
+                _buildInfoRow('Status:', status, isStatus: true),
                 const SizedBox(height: 30),
                 const Text(
                   'Event Details',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 20),
-                _buildInfoRow('Event Name:', userData['event'] ?? 'Not assigned'),
-                _buildInfoRow('Contact No:', '9499915932, 9094942184'),
+                _buildInfoRow('Event Name:', event),
+                _buildInfoRow('Event Date:', eventDate),
+                _buildInfoRow('Contact No:', phone),
               ],
             ),
           ),
@@ -83,10 +107,10 @@ class UserDetailScreen extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              value,
+              value.isEmpty ? 'N/A' : value,
               style: TextStyle(
                 fontSize: 16,
-                color: isStatus ? Colors.green : Colors.black,
+                color: isStatus ? _getStatusColor(status) : Colors.black,
                 fontWeight: isStatus ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
@@ -94,5 +118,20 @@ class UserDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'admitted':
+      case 'completed':
+        return Colors.green;
+      case 'approved':
+      case 'registered':
+        return Colors.blue;
+      case 'waiting':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
   }
 }

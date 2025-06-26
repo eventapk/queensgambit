@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:queens_gambit/screens/admin/eventFormScreen.dart';
+import 'package:queens_gambit/screens/admin/qrScannerScreen.dart';
 import 'participants_screen.dart';
 
 class AdminHomePage extends StatelessWidget {
@@ -36,12 +37,15 @@ class AdminHomePage extends StatelessWidget {
                     'assets/images/adminheadlogo.png',
                     height: height * 0.045,
                   ),
-                  Text(
-                    adminName.toUpperCase(),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: width * 0.04,
-                      fontWeight: FontWeight.bold,
+                  Flexible(
+                    child: Text(
+                      adminName.toUpperCase(),
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: width * 0.04,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -74,7 +78,9 @@ class AdminHomePage extends StatelessWidget {
                         ),
                       ),
                       Expanded(
-                        child: _buildButtons(context, width, height),
+                        child: SingleChildScrollView(
+                          child: _buildButtons(context, width, height),
+                        ),
                       ),
                     ],
                   )
@@ -92,7 +98,9 @@ class AdminHomePage extends StatelessWidget {
                       ),
                       Expanded(
                         flex: 5,
-                        child: _buildButtons(context, width, height),
+                        child: SingleChildScrollView(
+                          child: _buildButtons(context, width, height),
+                        ),
                       ),
                     ],
                   ),
@@ -107,13 +115,14 @@ class AdminHomePage extends StatelessWidget {
 
   Widget _buildButtons(BuildContext context, double width, double height) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: width * 0.05),
+      padding: EdgeInsets.symmetric(horizontal: width * 0.03),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           _buildButton(context, 'Registered participants', 'registered', width, height),
           _buildButton(context, 'Waiting Participants', 'waiting', width, height),
           _buildButton(context, 'Approved Participants', 'approved', width, height),
+          _buildButton(context, 'QR Scanner', 'scanner', width, height),
           _buildButton(context, 'Form', 'form', width, height),
         ],
       ),
@@ -127,7 +136,7 @@ class AdminHomePage extends StatelessWidget {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.blue,
-          minimumSize: Size(width * 0.75, height * 0.06),
+          minimumSize: Size(double.infinity, height * 0.06),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(width * 0.03),
           ),
@@ -137,6 +146,11 @@ class AdminHomePage extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => EventFormScreen()),
+            );
+          } else if (routeType == 'scanner') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => QRScannerScreen()),
             );
           } else {
             Navigator.push(
